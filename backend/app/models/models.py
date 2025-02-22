@@ -1,12 +1,16 @@
 import uuid
 
-from sqlmodel import Field, Relationship
+from sqlmodel import Field, Relationship, SQLModel
 
 from app.models.apps import AppBase
 from app.models.orgs import OrgBase
 from app.models.packages import PackageBase
 from app.models.subscriptions import SubscriptionBase
 from app.models.users import UserBase
+
+
+class BaseModel(SQLModel):
+    pass
 
 
 class User(UserBase, table=True):
