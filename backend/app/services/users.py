@@ -1,22 +1,35 @@
 from typing import Any
 
+from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
-from app.core.security import get_password_hash
-from app.models.models import User
-from app.models.users import UserCreate, UserUpdate
+from app.core.security import decode_token, get_password_hash
+from app.models.models import Org, User
+from app.models.users import UserPublic, UserRegister, UserUpdate
 
 
 class UserServices:
-    def create_user(*, session: Session, user_create: UserCreate) -> User:
-        db_obj = User.model_validate(
-            user_create,
-            update={"hashed_password": get_password_hash(user_create.password)},
-        )
-        session.add(db_obj)
-        session.commit()
-        session.refresh(db_obj)
-        return db_obj
+    def register_user(*, session: Session, user_register: UserRegister) -> UserPublic:
+        try:
+            org_obj = Org.model_validate(user_register.org)
+            session.add(org_obj)
+            user_obj = User.model_validate(
+                user_register.user,
+                update={
+                    "password": get_password_hash(user_register.user.password),
+                    "org_id": org_obj.id,
+                },
+            )
+            session.add(user_obj)
+            session.commit()
+            session.refresh(org_obj, user_obj)
+        except Exception as e:
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to register: {str(e)}",
+            )
+        return UserPublic.model_validate(user_obj)
 
     def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
         user_data = user_in.model_dump(exclude_unset=True)
@@ -35,3 +48,16 @@ class UserServices:
         statement = select(User).where(User.email == email)
         session_user = session.exec(statement).first()
         return session_user
+
+    def verify_email_token(*, session: Session, token: str) -> UserRegister:
+        token_data = decode_token(token=token)
+        user_register = UserRegister.model_validate(token_data.sub)
+        user = UserServices.get_user_by_email(
+            session=session, email=user_register.user.email
+        )
+        if user:
+            raise HTTPException(
+                status_code=400,
+                detail="The user with this email already exists in the system",
+            )
+        return user_register

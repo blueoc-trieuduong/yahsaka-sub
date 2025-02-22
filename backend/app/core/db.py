@@ -1,9 +1,6 @@
-from sqlmodel import Session, create_engine, select
+from sqlmodel import Session, create_engine
 
 from app.core.config import settings
-from app.models.models import User
-from app.models.users import UserCreate
-from app.services.users import UserServices
 
 engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 
@@ -13,7 +10,7 @@ engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 # for more details: https://github.com/fastapi/full-stack-fastapi-template/issues/28
 
 
-def init_db(session: Session) -> None:
+def init_db(_: Session) -> None:
     # Tables should be created with Alembic migrations
     # But if you don't want to use migrations, create
     # the tables un-commenting the next lines
@@ -22,13 +19,14 @@ def init_db(session: Session) -> None:
     # This works because the models are already imported and registered from app.models
     # SQLModel.metadata.create_all(engine)
 
-    user = session.exec(
-        select(User).where(User.email == settings.FIRST_SUPERUSER)
-    ).first()
-    if not user:
-        user_in = UserCreate(
-            email=settings.FIRST_SUPERUSER,
-            password=settings.FIRST_SUPERUSER_PASSWORD,
-            is_superuser=True,
-        )
-        user = UserServices.create_user(session=session, user_create=user_in)
+    # user = session.exec(
+    #     select(User).where(User.email == settings.FIRST_SUPERUSER)
+    # ).first()
+    # if not user:
+    #     user_in = UserCreate(
+    #         email=settings.FIRST_SUPERUSER,
+    #         password=settings.FIRST_SUPERUSER_PASSWORD,
+    #         is_superuser=True,
+    #     )
+    #     user = UserServices.create_user(session=session, user_create=user_in)
+    pass

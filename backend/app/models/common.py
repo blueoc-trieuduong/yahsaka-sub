@@ -1,5 +1,7 @@
 from sqlmodel import Field, SQLModel
 
+from app.models.users import UserRegister
+
 
 class Message(SQLModel):
     message: str
@@ -11,7 +13,7 @@ class Token(SQLModel):
 
 
 class TokenPayload(SQLModel):
-    sub: str | None = None
+    sub: str | UserRegister | None = None
 
 
 class NewPassword(SQLModel):

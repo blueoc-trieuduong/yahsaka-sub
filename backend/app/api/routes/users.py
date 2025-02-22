@@ -2,20 +2,18 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import col, delete, func, select
+from sqlmodel import func, select
 
 from app.api.deps import (
     CurrentUser,
     SessionDep,
     get_current_active_superuser,
 )
-from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
 from app.models.common import Message
-from app.models.models import Item, User
+from app.models.models import User
 from app.models.users import (
     UpdatePassword,
-    UserCreate,
     UserPublic,
     UserRegister,
     UsersPublic,
@@ -23,7 +21,11 @@ from app.models.users import (
     UserUpdateMe,
 )
 from app.services.users import UserServices
-from app.utils import generate_new_account_email, send_email
+from app.utils import (
+    generate_email_verify_email,
+    generate_email_verify_token,
+    send_email,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -45,33 +47,6 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     users = session.exec(statement).all()
 
     return UsersPublic(data=users, count=count)
-
-
-@router.post(
-    "/", dependencies=[Depends(get_current_active_superuser)], response_model=UserPublic
-)
-def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
-    """
-    Create new user.
-    """
-    user = UserServices.get_user_by_email(session=session, email=user_in.email)
-    if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this email already exists in the system.",
-        )
-
-    user = UserServices.create_user(session=session, user_create=user_in)
-    if settings.emails_enabled and user_in.email:
-        email_data = generate_new_account_email(
-            email_to=user_in.email, username=user_in.email, password=user_in.password
-        )
-        send_email(
-            email_to=user_in.email,
-            subject=email_data.subject,
-            html_content=email_data.html_content,
-        )
-    return user
 
 
 @router.patch("/me", response_model=UserPublic)
@@ -140,20 +115,38 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     return Message(message="User deleted successfully")
 
 
-@router.post("/signup", response_model=UserPublic)
-def register_user(session: SessionDep, user_in: UserRegister) -> Any:
+@router.post("/verify-email", response_model=UserPublic)
+def verify_email(session: SessionDep, token: str) -> UserPublic:
     """
-    Create new user without the need to be logged in.
+    Verify email after user registers to the system
     """
-    user = UserServices.get_user_by_email(session=session, email=user_in.email)
+    user_register = UserServices.verify_email_token(session=session, token=token)
+    user = UserServices.register_user(session=session, user_register=user_register)
+    return user
+
+
+@router.post("/register")
+def register_user(session: SessionDep, payload: UserRegister) -> Message:
+    """
+    Register user by sending email verfification
+    """
+    user = UserServices.get_user_by_email(session=session, email=payload.user.email)
+
     if user:
         raise HTTPException(
             status_code=400,
             detail="The user with this email already exists in the system",
         )
-    user_create = UserCreate.model_validate(user_in)
-    user = UserServices.create_user(session=session, user_create=user_create)
-    return user
+    verify_token = generate_email_verify_token(payload=payload)
+    email_data = generate_email_verify_email(
+        email_to=payload.user.email, name=payload.user.first_name, token=verify_token
+    )
+    send_email(
+        email_to=payload.user.email,
+        subject=email_data.subject,
+        html_content=email_data.html_content,
+    )
+    return Message(message="Email verification link sent")
 
 
 @router.get("/{user_id}", response_model=UserPublic)
@@ -224,8 +217,6 @@ def delete_user(
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
-    statement = delete(Item).where(col(Item.owner_id) == user_id)
-    session.exec(statement)  # type: ignore
     session.delete(user)
     session.commit()
     return Message(message="User deleted successfully")

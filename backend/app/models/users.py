@@ -1,26 +1,41 @@
 import uuid
+from datetime import datetime
+from enum import Enum
 
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
+
+from app.models.orgs import OrgCreate
+
+
+class Roles(str, Enum):
+    OWNER = "Owner"
+    MEMBER = "Member"
 
 
 class UserBase(SQLModel):
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     phone_number: str = Field(unique=True, index=True, max_length=255)
     is_active: bool = Field(default=True)
-    first_name: str = Field(index=True, max_length=255)
-    last_name: str = Field(index=True, max_length=255)
-    role: str = Field(index=True, max_length=255)
+    first_name: str = Field(max_length=255)
+    last_name: str = Field(max_length=255)
+    role: str = Field(max_length=255, default=Roles.OWNER.value)
+    created_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
+    updated_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
 
 
-class UserCreate(UserBase):
+class UserCreate(SQLModel):
+    email: EmailStr = Field(max_length=255)
+    phone_number: str = Field(max_length=255)
+    first_name: str = Field(max_length=255)
+    last_name: str = Field(max_length=255)
     password: str = Field(min_length=8, max_length=40)
+    role: str = Field(max_length=255, default=Roles.OWNER.value)
 
 
 class UserRegister(SQLModel):
-    email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=40)
-    full_name: str | None = Field(default=None, max_length=255)
+    user: UserCreate
+    org: OrgCreate
 
 
 class UserUpdate(UserBase):

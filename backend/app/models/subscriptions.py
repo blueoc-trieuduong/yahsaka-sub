@@ -5,7 +5,7 @@ from sqlmodel import Field, SQLModel
 
 
 class SubscriptionBase(SQLModel):
-    stripe_sub_id: str = Field(max_length=255, nullable=True)
+    stripe_sub_id: str | None = Field(max_length=255, nullable=True)
     created_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
     updated_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
     unsubscribe_at: datetime | None = Field(default=None, nullable=True)

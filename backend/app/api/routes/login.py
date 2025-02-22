@@ -1,8 +1,6 @@
 from datetime import timedelta
 from typing import Annotated, Any
 
-from backend.app.models.schemas.common import Message, NewPassword, Token
-from backend.app.models.schemas.users import UserPublic
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -11,6 +9,8 @@ from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core import security
 from app.core.config import settings
 from app.core.security import get_password_hash
+from app.models.common import Message, NewPassword, Token
+from app.models.users import UserPublic
 from app.services.login import LoginServices
 from app.services.users import UserServices
 from app.utils import (

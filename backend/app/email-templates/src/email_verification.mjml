@@ -1,0 +1,15 @@
+<mjml>
+  <mj-body background-color="#fafbfc">
+    <mj-section background-color="#fff" padding="40px 20px">
+      <mj-column vertical-align="middle" width="100%">
+        <mj-text align="center" padding="35px" font-size="20px" font-family="Arial, Helvetica, sans-serif" color="#333">{{ project_name }} - Email Verification</mj-text>
+        <mj-text align="center" font-size="16px" padding-left="25px" padding-right="25px" font-family="Arial, Helvetica, sans-serif" color="#555"><span>Hello {{ name }},</span></mj-text>
+        <mj-text align="center" font-size="16px" padding-left="25px" padding-right="25px" font-family="Arial, Helvetica, sans-serif" color="#555">We've received a request to register to our system. You need to verify your email by clicking the button below:</mj-text>
+        <mj-button align="center" font-size="18px" background-color="#111" border-radius="8px" color="#fff" href="{{ link }}" padding="15px 30px">Verify email</mj-button>
+        <mj-text align="center" font-size="16px" padding-left="25px" padding-right="25px" font-family="Arial, Helvetica, sans-serif" color="#555">This link will expire in {{ valid_hours }} hour(s).</mj-text>
+        <mj-divider border-color="#ccc" border-width="2px"></mj-divider>
+        <mj-text align="center" font-size="14px" padding-left="25px" padding-right="25px" font-family="Arial, Helvetica, sans-serif" color="#555">If you didn't request a registration you can disregard this email.</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

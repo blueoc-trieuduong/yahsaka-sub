@@ -1,8 +1,9 @@
 import uuid
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
 from app.models.apps import AppBase
+from app.models.orgs import OrgBase
 from app.models.packages import PackageBase
 from app.models.subscriptions import SubscriptionBase
 from app.models.users import UserBase
@@ -11,12 +12,12 @@ from app.models.users import UserBase
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     org_id: uuid.UUID = Field(foreign_key="org.id")
-    password: str = Field(min_length=8, max_length=40)
+    password: str
 
     org: "Org" = Relationship(back_populates="users")
 
 
-class Org(SQLModel, table=True):
+class Org(OrgBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
     users: list[User] = Relationship(back_populates="org")
