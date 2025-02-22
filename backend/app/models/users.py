@@ -6,9 +6,11 @@ from sqlmodel import Field, SQLModel
 
 class UserBase(SQLModel):
     email: EmailStr = Field(unique=True, index=True, max_length=255)
-    is_active: bool = True
-    is_superuser: bool = False
-    full_name: str | None = Field(default=None, max_length=255)
+    phone_number: str = Field(unique=True, index=True, max_length=255)
+    is_active: bool = Field(default=True)
+    first_name: str = Field(index=True, max_length=255)
+    last_name: str = Field(index=True, max_length=255)
+    role: str = Field(index=True, max_length=255)
 
 
 class UserCreate(UserBase):
