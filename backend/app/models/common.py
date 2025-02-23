@@ -1,6 +1,7 @@
+from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
-from app.models.users import UserRegister
+from app.models.users import UserPublic, UserRegister
 
 
 class Message(SQLModel):
@@ -12,6 +13,10 @@ class Token(SQLModel):
     token_type: str = "bearer"
 
 
+class UserToken(Token):
+    user: UserPublic
+
+
 class TokenPayload(SQLModel):
     sub: str | UserRegister | None = None
 
@@ -19,3 +24,11 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=40)
+
+
+class VerifyEmailPayload(SQLModel):
+    token: str
+
+
+class EmailPayload(SQLModel):
+    email: EmailStr
