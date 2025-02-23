@@ -6,15 +6,17 @@ from sqlmodel import func, select
 from starlette import status
 
 from app.models.packages import PackageCreate, PackageListPublic
-from app.services.stripe import create_stripe_price, create_stripe_product
+from app.services.stripe import StripeService
 
 
 class PackageService:
     def get_all_package_service(
-        self, session: SessionDep, limit: int = 100, offset: int = 0
+         session: SessionDep,  app_id: str,limit: int = 100, offset: int = 0
     ) -> PackageListPublic:
         try:
-            packages = session.exec(select(Package).offset(offset).limit(limit)).all()
+            packages = session.exec(
+                select(Package).where(Package.app_id == app_id).offset(offset).limit(limit)
+            ).all()
 
             total = session.exec(select(func.count(Package.id))).one_or_none() or 0
 
@@ -45,7 +47,7 @@ class PackageService:
             session.refresh(new_package)
 
             try:
-                stripe_product = create_stripe_product(
+                stripe_product = StripeService.create_stripe_product(
                     new_package.title, new_package.description
                 )
             except Exception as e:
@@ -56,7 +58,7 @@ class PackageService:
                 )
 
             try:
-                stripe_price = create_stripe_price(stripe_product.id, new_package.price)
+                stripe_price = StripeService.create_stripe_price(stripe_product.id, new_package.price)
             except Exception as e:
                 session.rollback()
                 raise HTTPException(

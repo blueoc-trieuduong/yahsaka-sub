@@ -13,7 +13,9 @@ router = APIRouter()
 @router.get("/", response_model=PackageListPublic)
 def read_all_package_service(
     session: SessionDep,
+    app_id: str,
     limit: int = 100,
+    
 ) -> PackageListPublic:
     return PackageService.get_all_package_service(
         session=session,
