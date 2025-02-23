@@ -91,11 +91,12 @@ async def create_subscription_from_stripe(
         )
 
 
-async def update_stripe_subscription(
-    session: SessionDep, stripe_sub_id: str, new_package_id: str
-):
+async def update_stripe_subscription(session, stripe_sub_id: str, new_package_id: str):
     try:
-        new_package = session.get(Package, new_package_id)
+        statement = select(Package).where(Package.id == new_package_id)
+        result = await session.exec(statement)
+        new_package = result.first()
+
         if not new_package:
             raise HTTPException(status_code=404, detail="Package not found")
 
@@ -112,14 +113,16 @@ async def update_stripe_subscription(
                 status_code=400, detail="Failed to update Stripe subscription"
             )
 
-        subscription = (
-            session.query(Subscription)
-            .filter(Subscription.stripe_sub_id == stripe_sub_id)
-            .first()
-        )
+        subscription_statement = select(Subscription).where(Subscription.stripe_sub_id == stripe_sub_id)
+        subscription_result = await session.exec(subscription_statement)
+        subscription = subscription_result.first()
+
+        if not subscription:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+
         subscription.package_id = new_package_id
-        subscription.current_status = "upgrading"
-        await session.commit()
+        subscription.current_status = Status.UPGRADED  #
+        await session.refresh(subscription)
 
         return stripe_response.get("url")
 

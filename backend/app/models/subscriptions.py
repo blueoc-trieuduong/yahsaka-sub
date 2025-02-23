@@ -18,7 +18,7 @@ class SubscriptionBase(SQLModel):
     stripe_sub_id: str | None = Field(max_length=255, nullable=True)
     current_status: Status | None = Field(
         default=Status.PENDING, nullable=True
-    )  # Sử dụng Enum
+    ) 
     created_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
     updated_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
     unsubscribe_at: datetime | None = Field(default=None, nullable=True)
