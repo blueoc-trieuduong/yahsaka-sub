@@ -1,4 +1,3 @@
-from backend.app.services import package, subscription
 from fastapi import APIRouter
 
 from app.api.deps import (
@@ -6,6 +5,7 @@ from app.api.deps import (
 )
 from app.models.packages import PackageCreate, PackageListPublic
 from app.models.subscriptions import SubscriptionBase
+from app.services.packages import PackageService
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ def read_all_package_service(
     session: SessionDep,
     limit: int = 100,
 ) -> PackageListPublic:
-    return subscription.get_all_package_service(
+    return PackageService.get_all_package_service(
         session=session,
         limit=limit,
     )
@@ -26,7 +26,7 @@ def create_package(
     subscription: SubscriptionBase,
     session: SessionDep,
 ) -> PackageCreate:
-    return package.create_package_service(
+    return PackageService.create_package_service(
         session=session,
         subscription=subscription,
     )

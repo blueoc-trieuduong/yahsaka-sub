@@ -65,7 +65,7 @@ async def create_subscription(
 async def create_subscription(
     data: GetPackageForSubscription, current_user=CurrentUser, session=SessionDep
 ):
-    package_id = data.get("packageId")
+    package_id = data.get("id")
     if not package_id:
         raise HTTPException(status_code=400, detail="Missing packageId")
 
