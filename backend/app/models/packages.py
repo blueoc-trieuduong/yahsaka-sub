@@ -10,7 +10,7 @@ class PackageBase(SQLModel):
     stripe_product_id: str = Field(max_length=255)
     stripe_price_id: str = Field(max_length=255)
     price: int = Field(gt=0)
-    max_workspaces: int = Field(gt=0)
+    max_workplaces: int = Field(gt=0)
     max_employees: int = Field(gt=0)
     is_active: bool = Field(default=True)
     created_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
@@ -18,4 +18,17 @@ class PackageBase(SQLModel):
 
 
 class PackagePublic(PackageBase):
+    id: uuid.UUID
+
+
+class PackageCreate(PackageBase):
+    app_id: uuid.UUID
+
+
+class PackageListPublic(SQLModel):
+    data: list[PackagePublic]
+    total: int
+
+
+class GetPackageForSubscription(SQLModel):
     id: uuid.UUID
