@@ -9,7 +9,7 @@ from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core import security
 from app.core.config import settings
 from app.core.security import get_password_hash
-from app.models.common import Message, NewPassword, Token
+from app.models.common import Message, NewPassword, UserToken
 from app.models.users import UserPublic
 from app.services.login import LoginServices
 from app.services.users import UserServices
@@ -26,7 +26,7 @@ router = APIRouter(tags=["login"])
 @router.post("/login/access-token")
 def login_access_token(
     session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
-) -> Token:
+) -> UserToken:
     """
     OAuth2 compatible token login, get an access token for future requests
     """
@@ -38,10 +38,11 @@ def login_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return Token(
+    return UserToken(
+        user=UserPublic.model_validate(user),
         access_token=security.create_access_token(
             user.id, expires_delta=access_token_expires
-        )
+        ),
     )
 
 
