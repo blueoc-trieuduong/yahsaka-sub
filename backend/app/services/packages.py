@@ -1,26 +1,25 @@
-from http.client import HTTPException
-from importlib.resources import Package
+from uuid import UUID
 
-from backend.app.api.deps import SessionDep
+from fastapi import HTTPException
 from sqlmodel import func, select
 from starlette import status
 
-from app.models.packages import PackageCreate, PackageListPublic
-from app.services.stripe import StripeService
+from app.api.deps import SessionDep
+from app.models.models import Package
+from app.models.packages import PackageCreate, PackagePublic, PackagesPublic
+from app.services.stripes import StripeServices
 
 
-class PackageService:
-    def get_all_package_service(
-         session: SessionDep,  app_id: str,limit: int = 100, offset: int = 0
-    ) -> PackageListPublic:
+class PackageServices:
+    def get_packages_by_app_id(*, session: SessionDep, app_id: UUID) -> PackagesPublic:
         try:
-            packages = session.exec(
-                select(Package).where(Package.app_id == app_id).offset(offset).limit(limit)
-            ).all()
+            statement = select(Package).where(Package.app_id == app_id)
+            count_statement = select(func.count()).select_from(statement)
 
-            total = session.exec(select(func.count(Package.id))).one_or_none() or 0
+            count = session.exec(count_statement).one()
+            packages = session.exec(statement).all()
 
-            return PackageListPublic(data=packages, total=total)
+            return PackagesPublic(data=packages, count=count)
 
         except Exception as e:
             raise HTTPException(
@@ -28,52 +27,43 @@ class PackageService:
                 detail=f"Error fetching packages: {str(e)}",
             )
 
-    def create_package_service(
-        self, session: SessionDep, package_data: PackageCreate
-    ) -> Package:
+    def create_package(
+        *, session: SessionDep, package_data: PackageCreate, app_id: UUID
+    ) -> PackagePublic:
         try:
-            new_package = Package(
-                app_id=package_data.app_id,
-                title=package_data.title,
-                description=package_data.description,
-                price=package_data.price,
-                max_workplaces=package_data.max_workplaces,
-                max_employees=package_data.max_employees,
-                created_at=package_data.created_at,
-            )
-
-            session.add(new_package)
-            session.commit()
-            session.refresh(new_package)
-
             try:
-                stripe_product = StripeService.create_stripe_product(
-                    new_package.title, new_package.description
+                stripe_product = StripeServices.create_stripe_product(
+                    package_data.title, package_data.description
                 )
             except Exception as e:
-                session.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Stripe Product creation failed: {str(e)}",
                 )
 
             try:
-                stripe_price = StripeService.create_stripe_price(stripe_product.id, new_package.price)
+                stripe_price = StripeServices.create_stripe_price(
+                    stripe_product.id, package_data.price
+                )
             except Exception as e:
-                session.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Stripe Price creation failed: {str(e)}",
                 )
 
-            new_package.stripe_product_id = stripe_product.id
-            new_package.stripe_price_id = stripe_price.id
+            new_package = {
+                **package_data.model_dump(),
+                "app_id": app_id,
+                "stripe_product_id": stripe_product.id,
+                "stripe_price_id": stripe_price.id,
+            }
+            new_package = Package.model_validate(new_package)
 
             session.add(new_package)
             session.commit()
             session.refresh(new_package)
 
-            return new_package
+            return PackagePublic.model_validate(new_package)
 
         except Exception as e:
             session.rollback()

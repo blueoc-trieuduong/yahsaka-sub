@@ -1,9 +1,10 @@
-import uuid
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
+
+from sqlmodel import Field, SQLModel
 
 from app.models.packages import PackagePublic
-from sqlmodel import Field, SQLModel
 
 
 class Status(str, Enum):
@@ -17,45 +18,27 @@ class Status(str, Enum):
 
 class SubscriptionBase(SQLModel):
     stripe_sub_id: str | None = Field(max_length=255, nullable=True)
-    current_status: Status  = Field(
-        default=Status.ACTIVE,
-    ) 
+    status: str = Field(default=Status.ACTIVE)
     created_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
     updated_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
     unsubscribe_at: datetime | None = Field(default=None, nullable=True)
     unsubscribe_reasons: str | None = Field(nullable=True)
 
 
-class SubscriptionPublic(SubscriptionBase):
-    id: uuid.UUID
-
-
 class SubscriptionCreate(SubscriptionBase):
-    id: uuid.UUID
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-    package_id: uuid.UUID = Field(foreign_key="package.id")
+    id: UUID
+    user_id: UUID = Field(foreign_key="user.id")
+    package_id: UUID = Field(foreign_key="package.id")
 
 
-class Subscription(SubscriptionBase):
-    id: uuid.UUID
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-    package_id: uuid.UUID = Field(foreign_key="package.id")
-
-
-class SubscriptionWithPackageInfo(SQLModel):
-    created_at: datetime
-    updated_at: datetime
+class SubscriptionPublic(SubscriptionBase):
     package: PackagePublic
 
 
-class SubscriptionHistoryItem(SQLModel):
-    subscription_id: uuid.UUID
-    status: str
-    created_at: datetime
-    updated_at: datetime
-    unsubscribe_at: datetime | None
-    package: PackagePublic
+class SubscriptionsPublic(SQLModel):
+    data: list[SubscriptionPublic]
+    count: int
 
-class SubscriptionHistory(SQLModel):
-    data: list[SubscriptionHistoryItem]
-    total: int
+
+class CheckoutCreateOrUpdate(SQLModel):
+    package_id: UUID

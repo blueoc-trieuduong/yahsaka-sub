@@ -1,35 +1,30 @@
+from uuid import UUID
+
 from fastapi import APIRouter
 
 from app.api.deps import (
     SessionDep,
 )
-from app.models.packages import PackageCreate, PackageListPublic
-from app.models.subscriptions import SubscriptionBase
-from app.services.packages import PackageService
+from app.models.packages import PackageCreate, PackagePublic, PackagesPublic
+from app.services.packages import PackageServices
 
-router = APIRouter()
+router = APIRouter(prefix="/apps", tags=["Packages"])
 
 
-@router.get("/", response_model=PackageListPublic)
+@router.get("/{app_id}/packages", response_model=PackagesPublic)
 def read_all_package_service(
     session: SessionDep,
-    app_id: str,
-    limit: int = 100,
-    
-) -> PackageListPublic:
-    return PackageService.get_all_package_service(
-        session=session,
-        app_id=app_id,
-        limit=limit,
-    )
+    app_id: UUID,
+) -> PackagesPublic:
+    return PackageServices.get_packages_by_app_id(session=session, app_id=app_id)
 
 
-@router.post("/", response_model=PackageCreate)
+@router.post("/{app_id}/packages", response_model=PackagePublic)
 def create_package(
-    subscription: SubscriptionBase,
+    package_create: PackageCreate,
     session: SessionDep,
-) -> PackageCreate:
-    return PackageService.create_package_service(
-        session=session,
-        subscription=subscription,
+    app_id: UUID,
+) -> PackagePublic:
+    return PackageServices.create_package(
+        session=session, package_data=package_create, app_id=app_id
     )

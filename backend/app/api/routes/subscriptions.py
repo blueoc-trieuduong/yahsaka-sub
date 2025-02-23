@@ -1,67 +1,61 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
+from sqlmodel import select
 
-from app.api.deps import CurrentUser, SessionDep, get_current_user
+from app.api.deps import CurrentUser, SessionDep
 from app.models.models import Subscription
-from app.models.packages import GetPackageForSubscription
-from app.models.subscriptions import Status
+from app.models.subscriptions import (
+    CheckoutCreateOrUpdate,
+    Status,
+    SubscriptionPublic,
+    SubscriptionsPublic,
+)
 from app.services.subscriptions import (
     SubscriptionServices,
 )
-from sqlmodel import select
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
 
-@router.get("/current-subscription")
-async def get_current_subscription(current_user=CurrentUser, session=SessionDep):
-    try:
-        subscription_data = await SubscriptionServices.get_current_active_subscription_and_package(
-            session, current_user.id
-        )
-        return subscription_data
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+@router.get("/current", response_model=SubscriptionPublic)
+def get_current_subscription(
+    current_user: CurrentUser, session: SessionDep
+) -> SubscriptionPublic:
+    return SubscriptionServices.get_current_active_subscription(
+        session=session, org_id=current_user.org_id
+    )
 
 
-@router.get("/subscription-hisotry")
-async def get_subscription_history(current_user=CurrentUser, session=SessionDep):
-    try:
-        subscription_history = await SubscriptionServices.get_subscription_history_for_user(
-            session, current_user.id
-        )
-        return subscription_history
+@router.get("/history")
+def get_subscription_history(
+    current_user: CurrentUser,
+    session: SessionDep,
+    page_index: int = 0,
+    page_size: int = 10,
+) -> SubscriptionsPublic:
+    return SubscriptionServices.get_subscription_history(
+        session=session,
+        org_id=current_user.org_id,
+        page_index=page_index,
+        page_size=page_size,
+    )
 
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
 
-
-
-@router.post("/")
-async def create_subscription(
-    data: GetPackageForSubscription, current_user=CurrentUser, session=SessionDep
+@router.post("/checkout")
+def create_checkout_url(
+    checkout_create: CheckoutCreateOrUpdate,
+    current_user: CurrentUser,
+    session: SessionDep,
 ):
-    package_id = data.id
-    if not package_id:
-        raise HTTPException(status_code=400, detail="Missing packageId")
-
-    try:
-        checkout_url = await SubscriptionServices.create_subscription_checkout_service(
-            session, package_id, current_user.id
-        )
-        return {"checkout_url": checkout_url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    checkout_url = SubscriptionServices.create_subscription_checkout(
+        session=session, package_id=checkout_create.package_id, user_id=current_user.id
+    )
+    return {"checkout_url": checkout_url}
 
 
 @router.post("/webhook")
-async def handle_stripe_webhook(request: Request, session=SessionDep):
+async def handle_stripe_webhook(request: Request, session: SessionDep):
     try:
         event = request.json()
 
@@ -71,11 +65,13 @@ async def handle_stripe_webhook(request: Request, session=SessionDep):
             user_id = metadata.get("user_id")
             package_id = metadata.get("package_id")
 
-            new_subscription = await SubscriptionServices.create_subscription_from_stripe(
-                session=session,
-                stripe_sub_id=subscription_id,
-                user_id=user_id,
-                package_id=package_id,
+            new_subscription = (
+                await SubscriptionServices.create_subscription_from_stripe(
+                    session=session,
+                    stripe_sub_id=subscription_id,
+                    user_id=user_id,
+                    package_id=package_id,
+                )
             )
             return {"status": "success", "subscription_id": new_subscription.id}
 
@@ -83,19 +79,19 @@ async def handle_stripe_webhook(request: Request, session=SessionDep):
             subscription_id = event["data"]["object"]["id"]
             status = event["data"]["object"]["status"]
 
-            subscription = (
-                session.query(Subscription)
-                .filter(Subscription.stripe_sub_id == subscription_id)
-                .first()
-            )
+            subscription = session.exec(
+                select(Subscription).where(
+                    Subscription.stripe_sub_id == subscription_id
+                )
+            ).first()
 
             if subscription:
-                if status == "active":
-                    subscription.current_status = Status.UPGRADED
-                elif status == "canceled":
-                    subscription.current_status = Status.CANCELED
+                if status == Status.ACTIVE:
+                    subscription.status = Status.UPGRADED
+                elif status == Status.CANCELED:
+                    subscription.status = Status.CANCELED
                 else:
-                    subscription.current_status = Status.PENDING
+                    subscription.status = Status.PENDING
 
                 subscription.updated_at = datetime.now()
                 await session.commit()
@@ -108,14 +104,14 @@ async def handle_stripe_webhook(request: Request, session=SessionDep):
         elif event.get("type") == "customer.subscription.deleted":
             subscription_id = event["data"]["object"]["id"]
 
-            subscription = (
-                session.query(Subscription)
-                .filter(Subscription.stripe_sub_id == subscription_id)
-                .first()
-            )
+            subscription = session.exec(
+                select(Subscription).where(
+                    Subscription.stripe_sub_id == subscription_id
+                )
+            ).first()
 
             if subscription:
-                subscription.current_status = Status.CANCELED
+                subscription.status = Status.CANCELED
                 subscription.unsubscribe_at = datetime.now()
                 await session.commit()
 
@@ -127,14 +123,14 @@ async def handle_stripe_webhook(request: Request, session=SessionDep):
         elif event.get("type") == "invoice.payment_succeeded":
             subscription_id = event["data"]["object"]["subscription"]
 
-            
-            statement = select(Subscription).where(Subscription.stripe_sub_id == subscription_id)
+            statement = select(Subscription).where(
+                Subscription.stripe_sub_id == subscription_id
+            )
             result = await session.exec(statement)
             subscription = result.first()
 
-
             if subscription:
-                subscription.current_status = Status.ACTIVE
+                subscription.status = Status.ACTIVE
                 subscription.updated_at = datetime.now()
                 await session.commit()
 
@@ -148,26 +144,21 @@ async def handle_stripe_webhook(request: Request, session=SessionDep):
 
 @router.post("/change-plan")
 async def change_subscription_plan(
-    data: GetPackageForSubscription, current_user=Depends(get_current_user), session=Depends(SessionDep)
+    checkout_update: CheckoutCreateOrUpdate,
+    current_user: CurrentUser,
+    session: SessionDep,
 ):
-    new_package_id = data.id
-    if not new_package_id:
-        raise HTTPException(status_code=400, detail="Missing new packageId")
-
     try:
-        current_subscription = (
-            session.query(Subscription)
-            .filter(
-                Subscription.user_id == current_user.id,
-                Subscription.current_status == "active",
-            )
-            .first()
+        statement = select(Subscription).where(
+            Subscription.user_id == current_user.id,
+            Subscription.status == Status.ACTIVE,
         )
+        current_subscription = session.exec(statement).first()
         if not current_subscription:
             raise HTTPException(status_code=404, detail="No active subscription found")
 
         checkout_url = await SubscriptionServices.update_stripe_subscription(
-            session, current_subscription.stripe_sub_id, new_package_id
+            session, current_subscription.stripe_sub_id, checkout_update.package_id
         )
         return {"checkout_url": checkout_url}
 

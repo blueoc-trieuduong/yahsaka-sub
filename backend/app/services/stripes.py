@@ -5,14 +5,12 @@ from sqlmodel import SQLModel
 
 from app.core.config import settings
 
-stripe_secret_key = settings.STRIPE_SECRET_KEY
-
 
 class StripeId(SQLModel):
     id: str
 
 
-class StripeService:
+class StripeServices:
     def create_stripe_checkout(data):
         try:
             payload = {
@@ -26,7 +24,7 @@ class StripeService:
             }
 
             headers = {
-                "Authorization": f"Bearer {stripe_secret_key}",
+                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
                 "Content-Type": "application/x-www-form-urlencoded",
             }
 
@@ -50,7 +48,7 @@ class StripeService:
     def create_stripe_product(title, description) -> StripeId:
         url = "https://api.stripe.com/v1/products"
         headers = {
-            "Authorization": f"Bearer {stripe_secret_key}",
+            "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
             "Content-Type": "application/x-www-form-urlencoded",
         }
         data = {"name": title, "description": description}
@@ -64,7 +62,7 @@ class StripeService:
     def create_stripe_price(stripe_product_id, price) -> StripeId:
         url = "https://api.stripe.com/v1/prices"
         headers = {
-            "Authorization": f"Bearer {stripe_secret_key}",
+            "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
             "Content-Type": "application/x-www-form-urlencoded",
         }
         data = {
@@ -88,7 +86,7 @@ class StripeService:
             }
 
             headers = {
-                "Authorization": f"Bearer {stripe_secret_key}",
+                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
                 "Content-Type": "application/x-www-form-urlencoded",
             }
 

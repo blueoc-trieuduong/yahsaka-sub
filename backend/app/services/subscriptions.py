@@ -1,26 +1,25 @@
 from datetime import datetime
+from uuid import UUID
 
 from fastapi import HTTPException
-from sqlmodel import select
+from sqlmodel import Session, func, select
 
 from app.api.deps import SessionDep
 from app.models.models import Package, Subscription
-from app.models.packages import PackagePublic
 from app.models.subscriptions import (
     Status,
     SubscriptionCreate,
-    SubscriptionHistory,
-    SubscriptionHistoryItem,
-    SubscriptionWithPackageInfo,
+    SubscriptionPublic,
+    SubscriptionsPublic,
 )
-from app.services.stripe import (
-    StripeService,
+from app.services.stripes import (
+    StripeServices,
 )
 
 
 class SubscriptionServices:
-    async def create_subscription_checkout_service(
-        session: SessionDep, package_id: str, user_id: str
+    def create_subscription_checkout(
+        *, session: SessionDep, package_id: UUID, user_id: UUID
     ):
         try:
             package = session.get(Package, package_id)
@@ -33,7 +32,7 @@ class SubscriptionServices:
                     status_code=400, detail="No price ID associated with this package"
                 )
 
-            stripe_session = StripeService.create_stripe_checkout(
+            stripe_session = StripeServices.create_stripe_checkout(
                 {"priceId": price_id, "user_id": user_id, "package_id": package_id}
             )
 
@@ -92,7 +91,7 @@ class SubscriptionServices:
                     status_code=400, detail="No price ID associated with this package"
                 )
 
-            stripe_response = StripeService.update_stripe_subscription_on_stripe(
+            stripe_response = StripeServices.update_stripe_subscription_on_stripe(
                 stripe_sub_id, price_id
             )
 
@@ -111,7 +110,7 @@ class SubscriptionServices:
                 raise HTTPException(status_code=404, detail="Subscription not found")
 
             subscription.package_id = new_package_id
-            subscription.current_status = Status.UPGRADED
+            subscription.status = Status.UPGRADED
             await session.refresh(subscription)
 
             return stripe_response.get("url")
@@ -123,162 +122,49 @@ class SubscriptionServices:
                 detail=f"Unexpected error during subscription update: {e}",
             )
 
-    async def get_current_active_subscription_and_package(session, user_id):
+    def get_current_active_subscription(
+        *, session: Session, org_id: UUID
+    ) -> SubscriptionPublic:
         try:
             statement = select(Subscription).where(
-                Subscription.user_id == user_id,
-                Subscription.current_status == Status.ACTIVE,
+                Subscription.org_id == org_id,
+                Subscription.status == Status.ACTIVE,
             )
-            result = await session.exec(statement)
-            active_subscription = result.first()
+            active_subscription = session.exec(statement).first()
 
             if not active_subscription:
                 raise HTTPException(
                     status_code=404, detail="No active subscription found for this user"
                 )
 
-            package_statement = select(Package).where(
-                Package.id == active_subscription.package_id
-            )
-            package_result = await session.exec(package_statement)
-            package = package_result.first()
-
-            if not package:
-                raise HTTPException(
-                    status_code=404, detail="Package not found for this subscription"
-                )
-
-            package_info = PackagePublic(
-                id=package.id,
-                title=package.title,
-                description=package.description,
-                stripe_product_id=package.stripe_product_id,
-                stripe_price_id=package.stripe_price_id,
-                price=package.price,
-                max_workplaces=package.max_workplaces,
-                max_employees=package.max_employees,
-                is_active=package.is_active,
-                created_at=package.created_at,
-                updated_at=package.updated_at,
-            )
-
-            subscription_with_package = SubscriptionWithPackageInfo(
-                created_at=active_subscription.created_at,
-                updated_at=active_subscription.updated_at,
-                package=package_info,
-            )
-
-            return subscription_with_package
+            return SubscriptionPublic.model_validate(active_subscription)
 
         except Exception as e:
             raise HTTPException(
                 status_code=500, detail=f"Error fetching subscription and package: {e}"
             )
 
-    async def get_current_active_subscription_and_package(session, user_id):
+    def get_subscription_history(
+        *, session: Session, org_id: UUID, page_index: int = 0, page_size: int = 10
+    ) -> SubscriptionsPublic:
         try:
-            statement = select(Subscription).where(
-                Subscription.user_id == user_id,
-                Subscription.current_status == Status.ACTIVE,
-            )
-            result = await session.exec(statement)
-            active_subscription = result.first()
+            statement = select(Subscription).where(Subscription.org_id == org_id)
+            count_statement = select(func.count()).select_from(statement)
 
-            if not active_subscription:
-                raise HTTPException(
-                    status_code=404, detail="No active subscription found for this user"
-                )
+            count = session.exec(count_statement).one()
+            subscriptions = session.exec(
+                statement.offset(page_index * page_size).limit(page_size)
+            ).all()
 
-            package_statement = select(Package).where(
-                Package.id == active_subscription.package_id
-            )
-            package_result = await session.exec(package_statement)
-            package = package_result.first()
-
-            if not package:
-                raise HTTPException(
-                    status_code=404, detail="Package not found for this subscription"
-                )
-
-            package_info = PackagePublic(
-                id=package.id,
-                title=package.title,
-                description=package.description,
-                stripe_product_id=package.stripe_product_id,
-                stripe_price_id=package.stripe_price_id,
-                price=package.price,
-                max_workplaces=package.max_workplaces,
-                max_employees=package.max_employees,
-                is_active=package.is_active,
-                created_at=package.created_at,
-                updated_at=package.updated_at,
-            )
-
-            subscription_with_package = SubscriptionWithPackageInfo(
-                created_at=active_subscription.created_at,
-                updated_at=active_subscription.updated_at,
-                package=package_info,
-            )
-
-            return subscription_with_package
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Error fetching subscription and package: {e}"
-            )
-
-    async def get_subscription_history_for_user(session, user_id):
-        try:
-            statement = select(Subscription).where(Subscription.user_id == user_id)
-            result = await session.exec(statement)
-            subscriptions = result.all()
-
-            if not subscriptions:
-                raise HTTPException(
-                    status_code=404, detail="No subscriptions found for this user"
-                )
-
-            subscription_history_list = []
-
+            subscriptions_list: list[SubscriptionPublic] = []
             for sub in subscriptions:
-                package_statement = select(Package).where(Package.id == sub.package_id)
-                package_result = await session.exec(package_statement)
-                package = package_result.first()
+                sub = SubscriptionPublic.model_validate(sub)
+                subscriptions_list.append(sub)
 
-                if not package:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Package not found for subscription {sub.id}",
-                    )
-
-                subscription_item = SubscriptionHistoryItem(
-                    subscription_id=sub.id,
-                    status=sub.current_status,
-                    created_at=sub.created_at,
-                    updated_at=sub.updated_at,
-                    unsubscribe_at=sub.unsubscribe_at,
-                    package=PackagePublic(
-                        id=package.id,
-                        title=package.title,
-                        description=package.description,
-                        stripe_product_id=package.stripe_product_id,
-                        stripe_price_id=package.stripe_price_id,
-                        price=package.price,
-                        max_workplaces=package.max_workplaces,
-                        max_employees=package.max_employees,
-                        is_active=package.is_active,
-                        created_at=package.created_at,
-                        updated_at=package.updated_at,
-                    ),
-                )
-
-                subscription_history_list.append(subscription_item)
-
-            return SubscriptionHistory(
-                data=subscription_history_list, total=len(subscription_history_list)
-            )
+            return SubscriptionsPublic(data=subscriptions_list, count=count)
 
         except Exception as e:
             raise HTTPException(
-                status_code=500, detail=f"Error fetching subscription history: {e}"
+                status_code=e.status_code,
+                detail=f"Error fetching subscription history: {e}",
             )
