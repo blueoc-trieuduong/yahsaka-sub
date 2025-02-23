@@ -1,7 +1,7 @@
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
-from app.models.users import UserRegister
+from app.models.users import UserPublic, UserRegister
 
 
 class Message(SQLModel):
@@ -11,6 +11,10 @@ class Message(SQLModel):
 class Token(SQLModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class UserToken(Token):
+    user: UserPublic
 
 
 class TokenPayload(SQLModel):

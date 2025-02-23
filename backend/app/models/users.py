@@ -5,7 +5,7 @@ from enum import Enum
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
-from app.models.orgs import OrgCreate
+from app.models.orgs import OrgCreate, OrgPublic
 
 
 class Roles(str, Enum):
@@ -60,3 +60,8 @@ class UserPublic(UserBase):
 class UsersPublic(SQLModel):
     data: list[UserPublic]
     count: int
+
+
+class UserDetails(SQLModel):
+    user: UserPublic
+    org: OrgPublic
