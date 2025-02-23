@@ -19,6 +19,7 @@ def read_all_package_service(
 ) -> PackageListPublic:
     return PackageService.get_all_package_service(
         session=session,
+        app_id=app_id,
         limit=limit,
     )
 
