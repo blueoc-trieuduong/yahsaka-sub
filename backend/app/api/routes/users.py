@@ -11,7 +11,7 @@ from app.api.deps import (
 )
 from app.core.security import get_password_hash, verify_password
 from app.models.common import EmailPayload, Message, VerifyEmailPayload
-from app.models.models import Org, User
+from app.models.models import User
 from app.models.users import (
     UpdatePassword,
     UserDetails,
@@ -103,12 +103,11 @@ def read_user_me(current_user: CurrentUser) -> Any:
 
 
 @router.get("/me/details", response_model=UserDetails)
-def read_user_details(session: SessionDep, current_user: CurrentUser) -> Any:
+def read_user_details(current_user: CurrentUser) -> Any:
     """
     Get user details, contains user and org.
     """
-    org = session.get(Org, current_user.org_id)
-    return UserDetails.model_validate({"user": current_user, "org": org})
+    return UserDetails.model_validate({"user": current_user, "org": current_user.org})
 
 
 @router.delete("/me", response_model=Message)
