@@ -60,13 +60,10 @@ class SubscriptionServices:
             print('org_id', org_id)
             print('pacakge_id', package_id)
 
-            new_subscription = SubscriptionCreate(
-                id=uuid.uuid4(),
+            new_subscription = Subscription(
                 stripe_sub_id=stripe_sub_id,
                 org_id=org_id,
                 package_id=package_id,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
             )
 
             session.add(new_subscription)
