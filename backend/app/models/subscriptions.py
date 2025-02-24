@@ -25,10 +25,13 @@ class SubscriptionBase(SQLModel):
     unsubscribe_reasons: str | None = Field(nullable=True)
 
 
-class SubscriptionCreate(SubscriptionBase):
+class SubscriptionCreate(SQLModel):
     id: UUID
+    stripe_sub_id: str | None = Field(max_length=255, nullable=True)
     org_id: UUID = Field(foreign_key="user.id")
     package_id: UUID = Field(foreign_key="package.id")
+    created_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
+    updated_at: datetime | None = Field(default_factory=datetime.now, nullable=True)
 
 
 class SubscriptionPublic(SubscriptionBase):

@@ -1,5 +1,6 @@
 from datetime import datetime
 from uuid import UUID
+import uuid
 
 from fastapi import HTTPException
 from sqlmodel import Session, func, select
@@ -60,6 +61,7 @@ class SubscriptionServices:
             print('pacakge_id', package_id)
 
             new_subscription = SubscriptionCreate(
+                id=uuid.uuid4(),
                 stripe_sub_id=stripe_sub_id,
                 org_id=org_id,
                 package_id=package_id,
