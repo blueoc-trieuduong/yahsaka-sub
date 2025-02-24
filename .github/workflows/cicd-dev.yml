@@ -25,4 +25,4 @@ jobs:
 
     - name: Build docker image
       run: |
-        docker-compose -f docker-compose.dev.yml --env-file ${{ secrets.ENV_PATH }} up -d
+        docker compose -f docker-compose.dev.yml --env-file ${{ secrets.ENV_PATH }} up -d
