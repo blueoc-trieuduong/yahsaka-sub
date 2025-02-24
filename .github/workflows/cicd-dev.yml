@@ -25,4 +25,4 @@ jobs:
 
     - name: Build docker image
       run: |
-        docker compose up -f docker-compose.dev.yml -d
+        docker compose -f docker-compose.dev.yml up -d
