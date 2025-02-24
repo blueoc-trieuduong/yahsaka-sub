@@ -11,7 +11,6 @@ from jwt.exceptions import InvalidTokenError
 
 from app.core import security
 from app.core.config import settings
-from app.models.users import UserRegister
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -83,7 +82,7 @@ def generate_reset_password_email(email_to: str, email: str, token: str) -> Emai
     return EmailData(html_content=html_content, subject=subject)
 
 
-def generate_email_verify_email(email_to: str, name: str, token: str) -> EmailData:
+def generate_email_verify_email(name: str, token: str) -> EmailData:
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - Email verification"
     link = f"{settings.FRONTEND_HOST}/verify-email?token={token}"
@@ -92,7 +91,22 @@ def generate_email_verify_email(email_to: str, name: str, token: str) -> EmailDa
         context={
             "project_name": settings.PROJECT_NAME,
             "name": name,
-            "email": email_to,
+            "valid_hours": settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS,
+            "link": link,
+        },
+    )
+    return EmailData(html_content=html_content, subject=subject)
+
+
+def generate_invite_org_email(org_name: str, token: str) -> EmailData:
+    project_name = settings.PROJECT_NAME
+    subject = f"{project_name} - Organization invitation"
+    link = f"{settings.FRONTEND_HOST}/join-org?token={token}"
+    html_content = render_email_template(
+        template_name="invite_org.html",
+        context={
+            "project_name": settings.PROJECT_NAME,
+            "org_name": org_name,
             "valid_hours": settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS,
             "link": link,
         },
@@ -141,13 +155,13 @@ def verify_password_reset_token(token: str) -> str | None:
         return None
 
 
-def generate_email_verify_token(payload: UserRegister) -> str:
+def generate_email_verify_token(payload: dict) -> str:
     delta = timedelta(hours=settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS)
     now = datetime.now(timezone.utc)
     expires = now + delta
     exp = expires.timestamp()
     encoded_jwt = jwt.encode(
-        {"exp": exp, "nbf": now, "sub": payload.model_dump()},
+        {"exp": exp, "nbf": now, "sub": payload},
         settings.SECRET_KEY,
         algorithm=security.ALGORITHM,
     )

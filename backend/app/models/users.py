@@ -5,7 +5,7 @@ from enum import Enum
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
-from app.models.orgs import OrgCreate, OrgPublic
+from app.models.orgs import OrgCreate, OrgPublic, OrgUpdate
 
 
 class Roles(str, Enum):
@@ -44,8 +44,14 @@ class UserUpdate(UserBase):
 
 
 class UserUpdateMe(SQLModel):
-    full_name: str | None = Field(default=None, max_length=255)
-    email: EmailStr | None = Field(default=None, max_length=255)
+    phone_number: str | None = Field(default=None, max_length=255)
+    first_name: str | None = Field(default=None, max_length=255)
+    last_name: str | None = Field(default=None, max_length=255)
+
+
+class UserProfileUpdate(SQLModel):
+    user: UserUpdateMe
+    org: OrgUpdate | None = Field(default=None)
 
 
 class UpdatePassword(SQLModel):

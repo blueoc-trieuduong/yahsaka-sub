@@ -16,7 +16,7 @@ class BaseModel(SQLModel):
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     org_id: uuid.UUID = Field(foreign_key="org.id")
-    password: str
+    password: str = Field(min_length=8, max_length=40)
 
     org: "Org" = Relationship(back_populates="users")
 

@@ -11,20 +11,23 @@ from app.api.deps import (
 )
 from app.core.security import get_password_hash, verify_password
 from app.models.common import EmailPayload, Message, VerifyEmailPayload
-from app.models.models import User
+from app.models.models import Org, User
+from app.models.orgs import OrgInvitation
 from app.models.users import (
+    Roles,
     UpdatePassword,
     UserDetails,
+    UserProfileUpdate,
     UserPublic,
     UserRegister,
     UsersPublic,
     UserUpdate,
-    UserUpdateMe,
 )
 from app.services.users import UserServices
 from app.utils import (
     generate_email_verify_email,
     generate_email_verify_token,
+    generate_invite_org_email,
     send_email,
 )
 
@@ -50,28 +53,53 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     return UsersPublic(data=users, count=count)
 
 
-@router.patch("/me", response_model=UserPublic)
+@router.put("/me", response_model=UserDetails)
 def update_user_me(
-    *, session: SessionDep, user_in: UserUpdateMe, current_user: CurrentUser
-) -> Any:
+    *, session: SessionDep, user_in: UserProfileUpdate, current_user: CurrentUser
+) -> UserDetails:
     """
-    Update own user.
+    Update own user and own org.
     """
+    user_update = user_in.user
 
-    if user_in.email:
-        existing_user = UserServices.get_user_by_email(
-            session=session, email=user_in.email
-        )
+    if user_update and user_update.phone_number:
+        existing_user = session.exec(
+            select(User).where(User.phone_number == user_update.phone_number)
+        ).first()
         if existing_user and existing_user.id != current_user.id:
             raise HTTPException(
-                status_code=409, detail="User with this email already exists"
+                status_code=409, detail="User with this phone number already exists"
             )
-    user_data = user_in.model_dump(exclude_unset=True)
+    user_data = user_update.model_dump(exclude_unset=True)
     current_user.sqlmodel_update(user_data)
     session.add(current_user)
+
+    if current_user.role == Roles.OWNER:
+        org_update = user_in.org
+        if org_update:
+            if org_update.slug:
+                existing_org = session.exec(
+                    select(Org).where(Org.slug == org_update.slug)
+                ).first()
+                if existing_org and existing_org.id != current_user.org_id:
+                    raise HTTPException(
+                        status_code=409, detail="Org with this slug already exists"
+                    )
+            if org_update.company_prefix:
+                existing_org = session.exec(
+                    select(Org).where(Org.company_prefix == org_update.company_prefix)
+                ).first()
+                if existing_org and existing_org.id != current_user.org_id:
+                    raise HTTPException(
+                        status_code=409, detail="Org with this prefix already exists"
+                    )
+            org_data = org_update.model_dump(exclude_unset=True)
+            current_user.org.sqlmodel_update(org_data)
+            session.add(current_user.org)
+
     session.commit()
     session.refresh(current_user)
-    return current_user
+    return UserDetails.model_validate({"user": current_user, "org": current_user.org})
 
 
 @router.patch("/me/password", response_model=Message)
@@ -81,14 +109,14 @@ def update_password_me(
     """
     Update own password.
     """
-    if not verify_password(body.current_password, current_user.hashed_password):
+    if not verify_password(body.current_password, current_user.password):
         raise HTTPException(status_code=400, detail="Incorrect password")
     if body.current_password == body.new_password:
         raise HTTPException(
             status_code=400, detail="New password cannot be the same as the current one"
         )
     hashed_password = get_password_hash(body.new_password)
-    current_user.hashed_password = hashed_password
+    current_user.password = hashed_password
     session.add(current_user)
     session.commit()
     return Message(message="Password updated successfully")
@@ -162,9 +190,9 @@ def register_user(session: SessionDep, payload: UserRegister) -> Message:
             status_code=400,
             detail="The user with this email already exists in the system",
         )
-    verify_token = generate_email_verify_token(payload=payload)
+    verify_token = generate_email_verify_token(payload=payload.model_dump())
     email_data = generate_email_verify_email(
-        email_to=payload.user.email, name=payload.user.first_name, token=verify_token
+        name=payload.user.first_name, token=verify_token
     )
     send_email(
         email_to=payload.user.email,
@@ -172,6 +200,50 @@ def register_user(session: SessionDep, payload: UserRegister) -> Message:
         html_content=email_data.html_content,
     )
     return Message(message="Email verification link sent")
+
+
+@router.post("/invite-org/{org_id}", response_model=Message)
+def invite_org(
+    session: SessionDep,
+    org_id: uuid.UUID,
+    current_user: CurrentUser,
+    payload: OrgInvitation,
+) -> Message:
+    """
+    Invite org by sending email to user
+    """
+    if current_user.org_id != org_id or current_user.role != Roles.OWNER:
+        raise HTTPException(
+            status_code=403,
+            detail="The user doesn't have enough privileges to invite to this org",
+        )
+
+    user = UserServices.get_user_by_email(session=session, email=payload.email)
+
+    if user:
+        if user.org_id == org_id:
+            raise HTTPException(
+                status_code=400,
+                detail="The user is already in this org",
+            )
+        raise HTTPException(
+            status_code=400,
+            detail="The user already has an org",
+        )
+
+    verify_token = generate_email_verify_token(
+        payload={"email": payload.email, "org_id": str(org_id)}
+    )
+    email_data = generate_invite_org_email(
+        org_name=current_user.org.name, token=verify_token
+    )
+
+    send_email(
+        email_to=payload.email,
+        subject=email_data.subject,
+        html_content=email_data.html_content,
+    )
+    return Message(message="Org invitation email sent")
 
 
 @router.get("/{user_id}", response_model=UserPublic)
