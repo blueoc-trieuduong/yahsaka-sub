@@ -63,7 +63,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
         
         if event_type == "invoice.payment_succeeded":
             subscription_id = event["data"]["object"]["subscription"]
-            metadata = event["data"]["object"].get("metadata", {})
+            metadata = event["data"]["object"]["metadata"]
             org_id = metadata.get("org_id")
             package_id = metadata.get("package_id")
 
