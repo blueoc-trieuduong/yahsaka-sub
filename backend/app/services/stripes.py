@@ -13,6 +13,7 @@ class StripeId(SQLModel):
 class StripeServices:
     def create_stripe_checkout(data):
         try:
+            print('dataSession', data)
             payload = {
                 "mode": "subscription",
                 "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/checkout",

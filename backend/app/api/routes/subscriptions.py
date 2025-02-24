@@ -57,14 +57,16 @@ def create_checkout_url(
 @router.post("/webhook")
 async def handle_stripe_webhook(request: Request, session: SessionDep):
     try:
+        print('webhook access')
         event = request.json()
+        print('event: ', event)
 
         if event.get("type") == "checkout.session.completed":
             subscription_id = event["data"]["object"]["subscription"]
             metadata = event["data"]["object"]["metadata"]
             user_id = metadata.get("user_id")
             package_id = metadata.get("package_id")
-
+            print('checout session completed wit', user_id, package_id)
             new_subscription = (
                 await SubscriptionServices.create_subscription_from_stripe(
                     session=session,
