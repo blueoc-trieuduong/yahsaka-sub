@@ -20,7 +20,7 @@ class StripeServices:
                 "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
                 "line_items[0][price]": data["priceId"],
                 "line_items[0][quantity]": "1",
-                "metadata[user_id]": data["user_id"],
+                "metadata[org_id]": data["org_id"],
                 "metadata[package_id]": data["package_id"],
             }
 
