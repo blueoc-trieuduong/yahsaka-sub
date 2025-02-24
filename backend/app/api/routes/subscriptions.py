@@ -49,7 +49,7 @@ def create_checkout_url(
     session: SessionDep,
 ):
     checkout_url = SubscriptionServices.create_subscription_checkout(
-        session=session, package_id=checkout_create.package_id, user_id=current_user.id
+        session=session, package_id=checkout_create.package_id, org_id=current_user.org_id
     )
     return {"checkout_url": checkout_url}
 
@@ -64,14 +64,14 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
         if event.get("type") == "checkout.session.completed":
             subscription_id = event["data"]["object"]["subscription"]
             metadata = event["data"]["object"]["metadata"]
-            user_id = metadata.get("user_id")
+            org_id = metadata.get("org_id")
             package_id = metadata.get("package_id")
-            print(f"Checkout session completed for user_id: {user_id}, package_id: {package_id}, subscription_id: {subscription_id}")
+            print(f"Checkout session completed for org_id: {org_id}, package_id: {package_id}, subscription_id: {subscription_id}")
 
-            new_subscription = await SubscriptionServices.create_subscription_from_stripe(
+            new_subscription =  SubscriptionServices.create_subscription_from_stripe(
                 session=session,
                 stripe_sub_id=subscription_id,
-                user_id=user_id,
+                org_id=org_id,
                 package_id=package_id,
             )
             return {"status": "success", "subscription_id": new_subscription.id}

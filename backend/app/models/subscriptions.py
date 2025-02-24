@@ -27,7 +27,7 @@ class SubscriptionBase(SQLModel):
 
 class SubscriptionCreate(SubscriptionBase):
     id: UUID
-    user_id: UUID = Field(foreign_key="user.id")
+    org_id: UUID = Field(foreign_key="user.id")
     package_id: UUID = Field(foreign_key="package.id")
 
 

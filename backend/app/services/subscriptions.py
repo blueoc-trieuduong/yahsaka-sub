@@ -19,7 +19,7 @@ from app.services.stripes import (
 
 class SubscriptionServices:
     def create_subscription_checkout(
-        *, session: SessionDep, package_id: UUID, user_id: UUID
+        *, session: SessionDep, package_id: UUID, org_id: UUID
     ):
         try:
             print("package_id", package_id)
@@ -34,7 +34,7 @@ class SubscriptionServices:
                 )
             print("price_id", price_id)
             stripe_session = StripeServices.create_stripe_checkout(
-                {"priceId": price_id, "user_id": user_id, "package_id": package_id}
+                {"priceId": price_id, "org_id": org_id, "package_id": package_id}
             )
 
             if not stripe_session:
@@ -50,30 +50,31 @@ class SubscriptionServices:
                 detail=f"Unexpected error during subscription creation: {e}",
             )
 
-    async def create_subscription_from_stripe(
-        session: SessionDep, stripe_sub_id: str, user_id: str, package_id: str
+    def create_subscription_from_stripe(
+        session: Session, stripe_sub_id: str, org_id: str, package_id: str
     ) -> SubscriptionCreate:
         try:
             print('createSub access')
             print('stripe_sup_id', stripe_sub_id)
-            print('user_id', stripe_sub_id)
-            print('pacakge_id', stripe_sub_id)
+            print('org_id', org_id)
+            print('pacakge_id', package_id)
+
             new_subscription = SubscriptionCreate(
                 stripe_sub_id=stripe_sub_id,
-                user_id=user_id,
+                org_id=org_id,
                 package_id=package_id,
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
             )
 
             session.add(new_subscription)
-            await session.commit()
+            session.commit()
             session.refresh(new_subscription)
 
             return new_subscription
 
         except Exception as e:
-            await session.rollback()
+            session.rollback()
             raise HTTPException(
                 status_code=500,
                 detail=f"Unexpected error while saving subscription: {e}",
