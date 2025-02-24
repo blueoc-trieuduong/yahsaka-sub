@@ -10,10 +10,11 @@ from app.api.deps import (
     get_current_active_superuser,
 )
 from app.core.security import get_password_hash, verify_password
-from app.models.common import Message
+from app.models.common import EmailPayload, Message, VerifyEmailPayload
 from app.models.models import User
 from app.models.users import (
     UpdatePassword,
+    UserDetails,
     UserPublic,
     UserRegister,
     UsersPublic,
@@ -101,8 +102,16 @@ def read_user_me(current_user: CurrentUser) -> Any:
     return current_user
 
 
+@router.get("/me/details", response_model=UserDetails)
+def read_user_details(current_user: CurrentUser) -> Any:
+    """
+    Get user details, contains user and org.
+    """
+    return UserDetails.model_validate({"user": current_user, "org": current_user.org})
+
+
 @router.delete("/me", response_model=Message)
-def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
+def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Message:
     """
     Delete own user.
     """
@@ -115,12 +124,28 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     return Message(message="User deleted successfully")
 
 
+@router.post("/check-email", response_model=Message)
+def check_email(session: SessionDep, payload: EmailPayload) -> Message:
+    """
+    Check existed email when user registers to the system
+    """
+    user = UserServices.get_user_by_email(session=session, email=payload.email)
+    if user:
+        raise HTTPException(
+            status_code=400,
+            detail="The user with this email already exists in the system",
+        )
+    return Message(message="Email is valid")
+
+
 @router.post("/verify-email", response_model=UserPublic)
-def verify_email(session: SessionDep, token: str) -> UserPublic:
+def verify_email(session: SessionDep, payload: VerifyEmailPayload) -> UserPublic:
     """
     Verify email after user registers to the system
     """
-    user_register = UserServices.verify_email_token(session=session, token=token)
+    user_register = UserServices.verify_email_token(
+        session=session, token=payload.token
+    )
     user = UserServices.register_user(session=session, user_register=user_register)
     return user
 
