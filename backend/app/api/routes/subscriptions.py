@@ -58,7 +58,7 @@ def create_checkout_url(
 async def handle_stripe_webhook(request: Request, session: SessionDep):
     try:
         print('webhook access')
-        event = request.json()
+        event = await request.json()
         print('event: ', event)
 
         if event.get("type") == "checkout.session.completed":
