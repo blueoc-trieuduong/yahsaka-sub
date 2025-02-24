@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
+import uuid
 
 from sqlmodel import Field, SQLModel
 
@@ -26,7 +27,7 @@ class SubscriptionBase(SQLModel):
 
 
 class SubscriptionCreate(SQLModel):
-    id: UUID
+    id: uuid.UUID
     stripe_sub_id: str | None = Field(max_length=255, nullable=True)
     org_id: UUID = Field(foreign_key="user.id")
     package_id: UUID = Field(foreign_key="package.id")
@@ -35,6 +36,7 @@ class SubscriptionCreate(SQLModel):
 
 
 class SubscriptionPublic(SubscriptionBase):
+    id: uuid.UUID
     package: PackagePublic
 
 

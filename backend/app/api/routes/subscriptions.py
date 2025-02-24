@@ -115,7 +115,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             if subscription:
                 subscription.status = Status.CANCELED
                 subscription.unsubscribe_at = datetime.now()
-                await session.commit()
+                session.commit()
 
             return {
                 "status": "subscription canceled",
@@ -134,7 +134,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             if subscription:
                 subscription.status = Status.ACTIVE
                 subscription.updated_at = datetime.now()
-                await session.commit()
+                session.commit()
 
             return {"status": "payment succeeded", "subscription_id": subscription.id}
 
