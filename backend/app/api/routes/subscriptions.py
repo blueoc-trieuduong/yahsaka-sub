@@ -59,26 +59,15 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
     try:
         print("Webhook accessed")
         event = await request.json()
-        print("Received event:", event)
-
-        if event.get("type") == "checkout.session.completed":
+        event_type = event.get("type")
+        
+        if event_type == "invoice.payment_succeeded":
             subscription_id = event["data"]["object"]["subscription"]
-            metadata = event["data"]["object"]["metadata"]
+            metadata = event["data"]["object"].get("metadata", {})
             org_id = metadata.get("org_id")
             package_id = metadata.get("package_id")
-            print(f"Checkout session completed for org_id: {org_id}, package_id: {package_id}, subscription_id: {subscription_id}")
 
-            new_subscription =  SubscriptionServices.create_subscription_from_stripe(
-                session=session,
-                stripe_sub_id=subscription_id,
-                org_id=org_id,
-                package_id=package_id,
-            )
-            return {"status": "success", "subscription_id": new_subscription.id}
-
-        elif event.get("type") == "customer.subscription.updated":
-            subscription_id = event["data"]["object"]["id"]
-            status = event["data"]["object"]["status"]
+            print(f"Payment succeeded for org_id: {org_id}, package_id: {package_id}, subscription_id: {subscription_id}")
 
             subscription = session.exec(
                 select(Subscription).where(
@@ -87,55 +76,21 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
 
             if subscription:
-                if status == Status.ACTIVE:
-                    subscription.status = Status.UPGRADED
-                elif status == Status.CANCELED:
-                    subscription.status = Status.CANCELED
-                else:
-                    subscription.status = Status.PENDING
-
+                subscription.package_id = package_id
+                subscription.status = Status.UPGRADED
                 subscription.updated_at = datetime.now()
                 await session.commit()
 
-            return {
-                "status": "subscription updated",
-                "subscription_id": subscription.id,
-            }
-
-        elif event.get("type") == "customer.subscription.deleted":
-            subscription_id = event["data"]["object"]["id"]
-
-            subscription = session.exec(
-                select(Subscription).where(
-                    Subscription.stripe_sub_id == subscription_id
+                print(f"Subscription upgraded successfully: {subscription_id}")
+                return {"status": "success", "subscription_id": subscription.id}
+            else:
+                new_subscription = SubscriptionServices.create_subscription_from_stripe(
+                    session=session,
+                    stripe_sub_id=subscription_id,
+                    org_id=org_id,
+                    package_id=package_id,
                 )
-            ).first()
-
-            if subscription:
-                subscription.status = Status.CANCELED
-                subscription.unsubscribe_at = datetime.now()
-                await session.commit()
-
-            return {
-                "status": "subscription canceled",
-                "subscription_id": subscription.id,
-            }
-
-        elif event.get("type") == "invoice.payment_succeeded":
-            subscription_id = event["data"]["object"]["subscription"]
-
-            statement = select(Subscription).where(
-                Subscription.stripe_sub_id == subscription_id
-            )
-            result = session.exec(statement)
-            subscription = result.first()
-
-            if subscription:
-                subscription.status = Status.ACTIVE
-                subscription.updated_at = datetime.now()
-                await session.commit()
-
-            return {"status": "payment succeeded", "subscription_id": subscription.id}
+                return {"status": "success", "subscription_id": new_subscription.id}
 
         return {"status": "unhandled event"}
 
