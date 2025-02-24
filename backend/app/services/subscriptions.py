@@ -55,6 +55,9 @@ class SubscriptionServices:
     ) -> SubscriptionCreate:
         try:
             print('createSub access')
+            print('stripe_sup_id' stripe_sub_id)
+            print('user_id' stripe_sub_id)
+            print('pacakge_id' stripe_sub_id)
             new_subscription = SubscriptionCreate(
                 stripe_sub_id=stripe_sub_id,
                 user_id=user_id,

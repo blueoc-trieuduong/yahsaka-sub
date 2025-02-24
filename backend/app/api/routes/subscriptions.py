@@ -66,7 +66,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             metadata = event["data"]["object"]["metadata"]
             user_id = metadata.get("user_id")
             package_id = metadata.get("package_id")
-            print(f"Checkout session completed for user_id: {user_id}, package_id: {package_id}")
+            print(f"Checkout session completed for user_id: {user_id}, package_id: {package_id}, subscription_id: {subscription_id}")
 
             new_subscription = await SubscriptionServices.create_subscription_from_stripe(
                 session=session,
