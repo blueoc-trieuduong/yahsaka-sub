@@ -1,5 +1,7 @@
+from http.client import HTTPException
 from uuid import UUID
 
+from app.models.models import Package
 from fastapi import APIRouter
 
 from app.api.deps import (
@@ -7,6 +9,7 @@ from app.api.deps import (
 )
 from app.models.packages import PackageCreate, PackagePublic, PackagesPublic
 from app.services.packages import PackageServices
+from sqlmodel import select
 
 router = APIRouter(prefix="/apps", tags=["Packages"])
 
@@ -18,6 +21,19 @@ def read_all_package_service(
 ) -> PackagesPublic:
     return PackageServices.get_packages_by_app_id(session=session, app_id=app_id)
 
+@router.get("/{app_id}/packages/{package_id}", response_model=PackagePublic)
+def get_package_by_id(
+    session: SessionDep,
+    package_id: UUID,
+    app_id: UUID,
+) -> PackagePublic:
+    statement = select(Package).where(
+        Package.id == package_id, Package.app_id == app_id
+    )
+    package = session.exec(statement).first()
+    if not package:
+        raise HTTPException(status_code=404, detail="Package not found")
+    return PackagePublic.model_validate(package)
 
 @router.post("/{app_id}/packages", response_model=PackagePublic)
 def create_package(
