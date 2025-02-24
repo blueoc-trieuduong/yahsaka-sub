@@ -68,7 +68,7 @@ class SubscriptionServices:
 
             session.add(new_subscription)
             await session.commit()
-            await session.refresh(new_subscription)
+            session.refresh(new_subscription)
 
             return new_subscription
 
