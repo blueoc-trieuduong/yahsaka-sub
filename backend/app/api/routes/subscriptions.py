@@ -79,7 +79,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 subscription.package_id = package_id
                 subscription.status = Status.UPGRADED
                 subscription.updated_at = datetime.now()
-                await session.commit()
+                session.commit()
 
                 print(f"Subscription upgraded successfully: {subscription_id}")
                 return {"status": "success", "subscription_id": subscription.id}

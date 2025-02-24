@@ -18,10 +18,9 @@ class StripeServices:
             "mode": "subscription",
             "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/checkout",
             "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
-            "line_items[0][price]": data["priceId"],  # ID của gói mới trên Stripe
+            "line_items[0][price]": data["priceId"],  
             "line_items[0][quantity]": "1",
             "subscription_data[trial_from_plan]": "false",
-            "subscription_data[proration_behavior]": "create_prorations",  # Tính phí chênh lệch
             "metadata[org_id]": data["org_id"],
             "metadata[package_id]": data["package_id"],
         }
