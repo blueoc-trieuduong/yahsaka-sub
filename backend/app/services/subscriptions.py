@@ -224,3 +224,19 @@ class SubscriptionServices:
                 status_code=e.status_code,
                 detail=f"Error fetching subscription history: {e}",
             )
+
+
+    def create_subscription_upgrade(session, package_id, org_id, subscription_id):
+            package = session.get(Package, package_id)
+            if not package:
+                raise HTTPException(status_code=404, detail="Package not found")
+            
+            checkout_data = {
+                "priceId": package.stripe_price_id,
+                "org_id": org_id,
+                "package_id": package_id,
+                "subscription_id": subscription_id
+            }
+            
+            checkout_session = StripeServices.create_stripe_upgrade_checkout(checkout_data)
+            return checkout_session.get("url")

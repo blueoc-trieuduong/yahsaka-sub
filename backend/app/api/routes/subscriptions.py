@@ -9,6 +9,7 @@ from app.models.subscriptions import (
     CheckoutCreateOrUpdate,
     Status,
     SubscriptionPublic,
+    SubscriptionUpgrade,
     SubscriptionsPublic,
 )
 from app.services.subscriptions import (
@@ -153,28 +154,19 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
         raise HTTPException(status_code=400, detail=f"Webhook handling failed: {e}")
 
 
-@router.post("/change-plan")
-def change_subscription_plan(
-    checkout_update: CheckoutCreateOrUpdate,
+@router.post("/upgrade-plan")
+def upgrade_subscription(
+    upgrade_data: SubscriptionUpgrade,
     current_user: CurrentUser,
     session: SessionDep,
 ):
-    try:
-        statement = select(Subscription).where(
-            Subscription.user_id == current_user.id,
-            Subscription.status == Status.ACTIVE,
-        )
-        current_subscription = session.exec(statement).first()
-        if not current_subscription:
-            raise HTTPException(status_code=404, detail="No active subscription found")
-
-        checkout_url = SubscriptionServices.update_stripe_subscription(
-            session, current_subscription.stripe_sub_id, checkout_update.package_id
-        )
-        return {"checkout_url": checkout_url}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    checkout_url = SubscriptionServices.create_subscription_upgrade(
+        session=session,
+        package_id=upgrade_data.package_id,
+        org_id=current_user.org_id,
+        subscription_id=upgrade_data.subscription_id
+    )
+    return {"checkout_url": checkout_url}
     
 
 @router.post("/downgrade")

@@ -117,3 +117,40 @@ class StripeServices:
         item["stripePriceId"] = stripe_price_id.id
         print("Subscription updated:", item)
         return item
+    
+    def create_stripe_upgrade_checkout(data):
+        try:
+            payload = {
+                "mode": "subscription",
+                "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
+                "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
+                "line_items[0][price]": data["priceId"],
+                "line_items[0][quantity]": "1",
+                "subscription_data[transfer_existing_items]": "true",
+                "subscription_data[subscription]": data["subscription_id"],
+                "metadata[org_id]": data["org_id"],
+                "metadata[package_id]": data["package_id"],
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+            
+            response = requests.post(
+                "https://api.stripe.com/v1/checkout/sessions",
+                headers=headers,
+                data=payload,
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                response.raise_for_status()
+        except Exception as error:
+            print(f"Error creating Stripe Upgrade Checkout: {error}")
+            raise HTTPException(
+                status_code=400, detail=f"Stripe Upgrade Checkout failed: {error}"
+            )
+        
+
