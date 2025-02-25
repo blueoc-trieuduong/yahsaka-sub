@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from dateutil.relativedelta import relativedelta
 
 import emails  # type: ignore
 import jwt
@@ -152,3 +153,12 @@ def generate_email_verify_token(payload: UserRegister) -> str:
         algorithm=security.ALGORITHM,
     )
     return encoded_jwt
+
+def get_current_date():
+    now = datetime.now()
+    return datetime(now.year, now.month, now.day)
+
+
+def get_next_month_date():
+    now = datetime.now()
+    return now + relativedelta(months=1)

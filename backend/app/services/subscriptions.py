@@ -1,7 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
-import uuid
-
+from dateutil.relativedelta import relativedelta
 from fastapi import HTTPException
 from sqlmodel import Session, func, select
 
@@ -79,13 +78,12 @@ class SubscriptionServices:
                 detail=f"Unexpected error while saving subscription: {e}",
             )
 
-    async def update_stripe_subscription(
+    def update_stripe_subscription(
         session, stripe_sub_id: str, new_package_id: str
     ):
         try:
             statement = select(Package).where(Package.id == new_package_id)
-            result = await session.exec(statement)
-            new_package = result.first()
+            new_package = session.exec(statement).first()
 
             if not new_package:
                 raise HTTPException(status_code=404, detail="Package not found")
@@ -108,24 +106,52 @@ class SubscriptionServices:
             subscription_statement = select(Subscription).where(
                 Subscription.stripe_sub_id == stripe_sub_id
             )
-            subscription_result = await session.exec(subscription_statement)
-            subscription = subscription_result.first()
+            subscription = session.exec(subscription_statement).first()
 
             if not subscription:
                 raise HTTPException(status_code=404, detail="Subscription not found")
 
             subscription.package_id = new_package_id
             subscription.status = Status.UPGRADED
-            await session.refresh(subscription)
+            session.refresh(subscription)
 
             return stripe_response.get("url")
 
         except Exception as e:
-            await session.rollback()
+            session.rollback()
             raise HTTPException(
                 status_code=500,
                 detail=f"Unexpected error during subscription update: {e}",
             )
+        
+
+    def downgrade_subscription(
+        *, session: Session, current_subscription: Subscription, new_package_id: str
+    ) -> SubscriptionPublic:
+        statement = select(Package).where(Package.id == new_package_id)
+        new_package = session.exec(statement).first()
+
+        if not new_package:
+            raise HTTPException(status_code=404, detail="Package not found")
+        
+        new_active_date = current_subscription.expired_date + timedelta(days=1)
+        new_expired_date = new_active_date + relativedelta(months=1)
+
+        subscription_create = SubscriptionCreate(
+            org_id=current_subscription.org_id,
+            package_id=new_package_id,
+            status=Status.PENDING,
+            active_date=new_active_date,
+            expired_date=new_expired_date,
+        )
+
+        new_subscription = Subscription.model_validate(subscription_create.model_dump())
+
+        session.add(new_subscription)
+        session.commit()
+        session.refresh(new_subscription)
+
+        return SubscriptionPublic.model_validate(new_subscription)
 
     def get_current_active_subscription(
         *, session: Session, org_id: UUID

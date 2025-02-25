@@ -146,7 +146,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
 
 
 @router.post("/change-plan")
-async def change_subscription_plan(
+def change_subscription_plan(
     checkout_update: CheckoutCreateOrUpdate,
     current_user: CurrentUser,
     session: SessionDep,
@@ -160,10 +160,33 @@ async def change_subscription_plan(
         if not current_subscription:
             raise HTTPException(status_code=404, detail="No active subscription found")
 
-        checkout_url = await SubscriptionServices.update_stripe_subscription(
+        checkout_url = SubscriptionServices.update_stripe_subscription(
             session, current_subscription.stripe_sub_id, checkout_update.package_id
         )
         return {"checkout_url": checkout_url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.post("/downgrade")
+def downgrade_subscription_plan(
+    checkout_update: CheckoutCreateOrUpdate,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    try:
+        statement = select(Subscription).where(
+            Subscription.org_id == current_user.org_id,
+            Subscription.status == Status.ACTIVE,
+        )
+        current_subscription = session.exec(statement).first()
+        if not current_subscription:
+            raise HTTPException(status_code=404, detail="No active subscription found")
+
+        return SubscriptionServices.downgrade_subscription(
+            session=session, current_subscription=current_subscription, new_package_id=checkout_update.package_id
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
