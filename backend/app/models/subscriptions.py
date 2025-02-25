@@ -51,3 +51,8 @@ class SubscriptionsPublic(SQLModel):
 
 class CheckoutCreateOrUpdate(SQLModel):
     package_id: UUID
+
+
+class SubscriptionUpgrade(SQLModel):
+    package_id: str
+    subscription_id: str
