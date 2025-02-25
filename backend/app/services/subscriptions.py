@@ -182,7 +182,7 @@ class SubscriptionServices:
         *, session: Session, org_id: UUID, page_index: int = 0, page_size: int = 10
     ) -> SubscriptionsPublic:
         try:
-            statement = select(Subscription).where(Subscription.org_id == org_id)
+            statement = select(Subscription).where(Subscription.org_id == org_id).order_by(desc(Subscription.created_at))
             count_statement = select(func.count()).select_from(statement)
 
             count = session.exec(count_statement).one()
