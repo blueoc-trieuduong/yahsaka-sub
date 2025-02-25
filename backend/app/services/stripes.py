@@ -16,7 +16,7 @@ class StripeServices:
             print('dataSession', data)
             payload = {
             "mode": "subscription",
-            "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/checkout",
+            "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
             "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
             "line_items[0][price]": data["priceId"], 
             "line_items[0][quantity]": "1",
