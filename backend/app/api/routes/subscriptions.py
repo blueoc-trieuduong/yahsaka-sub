@@ -26,6 +26,14 @@ def get_current_subscription(
         session=session, org_id=current_user.org_id
     )
 
+@router.get("/current-subscription", response_model=SubscriptionPublic)
+def get_current_subscription(
+    current_user: CurrentUser, session: SessionDep
+) -> SubscriptionPublic:
+    return SubscriptionServices.get_current_active_subscription_after(
+        session=session, org_id=current_user.org_id
+    )
+
 
 @router.get("/history")
 def get_subscription_history(
