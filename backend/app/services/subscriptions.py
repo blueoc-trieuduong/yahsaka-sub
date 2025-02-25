@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 from dateutil.relativedelta import relativedelta
 from fastapi import HTTPException
-from sqlmodel import Session, func, select
+from sqlmodel import Session, desc, func, select
 
 from app.api.deps import SessionDep
 from app.models.models import Package, Subscription
@@ -154,13 +154,14 @@ class SubscriptionServices:
         return SubscriptionPublic.model_validate(new_subscription)
 
     def get_current_active_subscription(
-        *, session: Session, org_id: UUID
-    ) -> SubscriptionPublic:
+    *, session: Session, org_id: UUID
+) -> SubscriptionPublic:
         try:
             statement = select(Subscription).where(
                 Subscription.org_id == org_id,
                 Subscription.status == Status.ACTIVE,
-            )
+            ).order_by(desc(Subscription.created_at))  
+
             active_subscription = session.exec(statement).first()
 
             if not active_subscription:
@@ -174,6 +175,8 @@ class SubscriptionServices:
             raise HTTPException(
                 status_code=500, detail=f"Error fetching subscription and package: {e}"
             )
+
+            
 
     def get_subscription_history(
         *, session: Session, org_id: UUID, page_index: int = 0, page_size: int = 10
