@@ -149,7 +149,6 @@ class StripeServices:
                 params=preview_params
             )
 
-
             
             if preview_response.status_code != 200:
                 print('loi o day ne')
@@ -157,7 +156,10 @@ class StripeServices:
                 raise HTTPException(status_code=400, detail="Failed to preview prorated charges")
             
             preview_data = preview_response.json()
-            prorated_amount = preview_data.get("proration_amount", 0)
+            prorated_amount = sum(
+    item["amount"] for item in preview_data["lines"]["data"] if item.get("proration", False)
+)
+
 
             print('previewData', preview_data)
             print('prorated_amount', prorated_amount)
