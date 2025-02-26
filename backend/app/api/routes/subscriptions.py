@@ -1,7 +1,8 @@
 from datetime import datetime
-
+import requests
 from fastapi import APIRouter, HTTPException, Request
 from sqlmodel import select
+from fastapi import Request
 
 from app.core.config import settings
 from app.api.deps import CurrentUser, SessionDep
@@ -156,19 +157,17 @@ def create_checkout_url(
 
 
 @router.post("/webhook")
-async def handle_stripe_webhook(request: Request, session: SessionDep):
+async def handle_stripe_webhook(session: SessionDep):
     try:
         print("Webhook accessed")
-        event = await request.json()
+        event = await requests.json()
         print("Received event:", event)
         
-        # Handle checkout.session.completed
         if event.get("type") == "checkout.session.completed":
             session_data = event["data"]["object"]
             metadata = session_data.get("metadata", {})
             
             if metadata.get("subscription_id") and metadata.get("new_price_id"):
-                # Handle subscription upgrade payment
                 subscription_id = metadata["subscription_id"]
                 org_id = metadata.get("org_id")
                 package_id = metadata.get("package_id")
@@ -190,7 +189,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 subscription = subscription_response.json()
                 subscription_item_id = subscription["items"]["data"][0]["id"]
                 
-                # Update subscription with new price
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": new_price_id,
