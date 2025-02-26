@@ -19,12 +19,12 @@ from app.core.security import (
 )
 from app.models.common import (
     EmailPayload,
-    InviteOrgPayload,
     Message,
     VerifyEmailPayload,
 )
 from app.models.models import Org, User
 from app.models.users import (
+    InviteOrgPayload,
     InviteOrgTokenPayload,
     JoinOrgPayload,
     Roles,
@@ -237,6 +237,15 @@ def join_org(
             status_code=400,
             detail="The user already has an org",
         )
+
+    UserServices.check_existing_entity(
+        session=session,
+        model=User,
+        attribute="phone_number",
+        value=payload.user.phone_number,
+        detail_message="User with this phone number already exists",
+    )
+
     user_obj = User.model_validate(
         payload.user,
         update={

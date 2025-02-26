@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
@@ -17,11 +15,6 @@ class Token(SQLModel):
 
 class UserToken(Token):
     user: UserPublic
-
-
-class InviteOrgPayload(SQLModel):
-    email: EmailStr
-    org_id: UUID
 
 
 class TokenPayload(SQLModel):

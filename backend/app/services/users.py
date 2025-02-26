@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlmodel import Session, select
+from sqlmodel import Session, SQLModel, select
 
 from app.core.security import decode_token, get_password_hash
 from app.models.models import Org, User
@@ -64,36 +64,49 @@ class UserServices:
             )
         return user_register
 
+    def check_existing_entity(
+        *,
+        session: Session,
+        model: SQLModel,
+        attribute: str,
+        value: Any,
+        detail_message: str,
+    ):
+        existing_entity = session.exec(
+            select(model).where(getattr(model, attribute) == value)
+        ).first()
+        if existing_entity:
+            raise HTTPException(status_code=409, detail=detail_message)
+
     def check_register_user(*, session: Session, user_register: UserRegister) -> None:
-        existing_user = UserServices.get_user_by_email(
-            session=session, email=user_register.user.email
+        UserServices.check_existing_entity(
+            session=session,
+            model=User,
+            attribute="email",
+            value=user_register.user.email,
+            detail_message="The user with this email already exists in the system",
         )
-        if existing_user:
-            raise HTTPException(
-                status_code=409,
-                detail="The user with this email already exists in the system",
-            )
 
-        existing_user = session.exec(
-            select(User).where(User.phone_number == user_register.user.phone_number)
-        ).first()
-        if existing_user:
-            raise HTTPException(
-                status_code=409, detail="User with this phone number already exists"
-            )
+        UserServices.check_existing_entity(
+            session=session,
+            model=User,
+            attribute="phone_number",
+            value=user_register.user.phone_number,
+            detail_message="User with this phone number already exists",
+        )
 
-        existing_org = session.exec(
-            select(Org).where(Org.slug == user_register.org.slug)
-        ).first()
-        if existing_org:
-            raise HTTPException(
-                status_code=409, detail="Org with this slug already exists"
-            )
+        UserServices.check_existing_entity(
+            session=session,
+            model=Org,
+            attribute="slug",
+            value=user_register.org.slug,
+            detail_message="Org with this slug already exists",
+        )
 
-        existing_org = session.exec(
-            select(Org).where(Org.company_prefix == user_register.org.company_prefix)
-        ).first()
-        if existing_org:
-            raise HTTPException(
-                status_code=409, detail="Org with this prefix already exists"
-            )
+        UserServices.check_existing_entity(
+            session=session,
+            model=Org,
+            attribute="company_prefix",
+            value=user_register.org.company_prefix,
+            detail_message="Org with this prefix already exists",
+        )
