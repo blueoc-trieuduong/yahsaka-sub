@@ -164,12 +164,11 @@ class StripeServices:
             print('previewData', preview_data)
             print('prorated_amount', prorated_amount)
 
-
-            
             success_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page"
             cancel_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet?upgrade_cancelled=true"
-            
+            print('preIf')
             if prorated_amount > 0:
+                print('inIf')
                 checkout_params = {
                     "mode": "payment",
                     "success_url": success_url,
@@ -184,12 +183,15 @@ class StripeServices:
                     "payment_intent_data[metadata][org_id]": data["org_id"],
                     "payment_intent_data[metadata][package_id]": data["package_id"],
                 }
+                print('outif')
                 
                 checkout_response = requests.post(
                     "https://api.stripe.com/v1/checkout/sessions",
                     headers=headers,
                     data=checkout_params
                 )
+                print('response', checkout_response)
+                print('response', checkout_response.status_code)
                 
                 if checkout_response.status_code != 200:
                     raise HTTPException(status_code=400, detail="Failed to create checkout session")
@@ -197,6 +199,7 @@ class StripeServices:
                 return checkout_response.json().get("url")
             
             else:
+                print('else')
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": data["price_id"],
