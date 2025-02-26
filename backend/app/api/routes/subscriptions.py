@@ -157,10 +157,10 @@ def create_checkout_url(
 
 
 @router.post("/webhook")
-async def handle_stripe_webhook(session: SessionDep):
+async def handle_stripe_webhook(request: Request, session: SessionDep):
     try:
         print("Webhook accessed")
-        event = await requests.json()
+        event = await request.json()
         print("Received event:", event)
         
         if event.get("type") == "checkout.session.completed":
