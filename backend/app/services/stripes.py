@@ -197,7 +197,8 @@ class StripeServices:
                     print('asdfadsfasssss')
                     raise HTTPException(status_code=400, detail="Failed to create checkout session")
                 print('response', checkout_response.json())
-                return checkout_response.json().get("url")
+                print('url', checkout_response.json()['url'])
+                return checkout_response.json()['url']
             
             else:
                 print('else')
