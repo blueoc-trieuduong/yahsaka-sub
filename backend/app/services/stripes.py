@@ -142,16 +142,18 @@ class StripeServices:
                 "subscription_items[0][price]": data["price_id"],
                 "subscription_items[0][quantity]": 1
             }
-            print('loi o day ne')
+            
             preview_response = requests.post(
                 "https://api.stripe.com/v1/subscription_items/preview",
                 headers=headers,
                 data=preview_params
             )
-            print('preview_res', preview_response)
+         
             
             if preview_response.status_code != 200:
-                raise HTTPException(400, detail="Failed to preview prorated charges")
+                print('loi o day ne')
+                print(preview_response.status_code)
+                raise HTTPException(status_code=400, detail="Failed to preview prorated charges")
             
             preview_data = preview_response.json()
             prorated_amount = preview_data.get("proration_amount", 0)
