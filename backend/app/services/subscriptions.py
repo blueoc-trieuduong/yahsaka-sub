@@ -233,7 +233,7 @@ class SubscriptionServices:
                 raise HTTPException(status_code=404, detail="Package not found")
             
             checkout_data = {
-                "priceId": package.stripe_price_id,
+                "price_id": package.stripe_price_id,
                 "org_id": org_id,
                 "package_id": package_id,
                 "subscription_id": subscription_id
