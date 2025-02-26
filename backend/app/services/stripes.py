@@ -170,25 +170,30 @@ class StripeServices:
             if prorated_amount > 0:
                 print('inIf')
                 checkout_params = {
-                    "mode": "subscription",
+                    "mode": "payment",  # Dùng "payment" thay vì "subscription"
                     "success_url": success_url,
                     "cancel_url": cancel_url,
-                    "customer": customer_id,  
-                    "subscription_data": {
-                        "subscription": data["subscription_id"],  
-                        "proration_behavior": "create_prorations" 
-                    },
+                    "customer": customer_id,
                     "line_items": [
                         {
-                            "price": data["price_id"],  
+                            "price_data": {
+                                "currency": "usd",
+                                "product_data": {
+                                    "name": "Upgrade to new plan"
+                                },
+                                "unit_amount": prorated_amount,
+                            },
                             "quantity": 1
                         }
                     ],
                     "metadata": {
+                        "subscription_id": data["subscription_id"],  # Để webhook có thể xử lý
                         "org_id": data["org_id"],
-                        "package_id": data["package_id"]
+                        "package_id": data["package_id"],
+                        "new_price_id": data["price_id"]
                     }
                 }
+
 
 
                 print('outif')
