@@ -155,26 +155,26 @@ class SubscriptionServices:
 
     def get_current_active_subscription(
     *, session: Session, org_id: UUID
-) -> SubscriptionPublic:
-        try:
-            statement = select(Subscription).where(
-                Subscription.org_id == org_id,
-                Subscription.status == Status.ACTIVE,
-            ).order_by(desc(Subscription.created_at))  
+    ) -> SubscriptionPublic:
+            try:
+                statement = select(Subscription).where(
+                    Subscription.org_id == org_id,
+                    Subscription.status == Status.ACTIVE,
+                ).order_by(desc(Subscription.created_at))  
 
-            active_subscription = session.exec(statement).first()
+                active_subscription = session.exec(statement).first()
 
-            if not active_subscription:
+                if not active_subscription:
+                    raise HTTPException(
+                        status_code=404, detail="No active subscription found for this user"
+                    )
+
+                return SubscriptionPublic.model_validate(active_subscription)
+
+            except Exception as e:
                 raise HTTPException(
-                    status_code=404, detail="No active subscription found for this user"
+                    status_code=500, detail=f"Error fetching subscription and package: {e}"
                 )
-
-            return SubscriptionPublic.model_validate(active_subscription)
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Error fetching subscription and package: {e}"
-            )
         
     def get_current_active_subscription_after(
     *, session: Session, org_id: UUID
