@@ -50,6 +50,7 @@ class StripeServices:
                 headers=headers,
                 data=payload,
             )
+            print('res', response)
 
             if response.status_code == 200:
                 return response.json()
