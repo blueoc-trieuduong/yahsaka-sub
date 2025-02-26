@@ -120,7 +120,6 @@ class StripeServices:
     
     def create_proration_checkout(data):
         try:
-            # 1. Get current subscription details
             headers = {
                 "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -137,8 +136,9 @@ class StripeServices:
             subscription = response.json()
             subscription_item_id = subscription["items"]["data"][0]["id"]
             customer_id = subscription["customer"]
+            print('sub_item_id', subscription_item_id)
+            print('cx id', customer_id)
             
-            # 2. Create a preview of the prorated amount
             preview_params = {
                 "subscription": data["subscription_id"],
                 "subscription_items[0][id]": subscription_item_id,
@@ -157,8 +157,12 @@ class StripeServices:
             
             preview_data = preview_response.json()
             prorated_amount = preview_data.get("proration_amount", 0)
+
+            print('previewData', preview_data)
+            print('prorated_amount', prorated_amount)
+
+
             
-            # 3. Create checkout session for the prorated amount
             success_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page?upgrade_success=true"
             cancel_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet?upgrade_cancelled=true"
             
