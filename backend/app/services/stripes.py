@@ -118,70 +118,102 @@ class StripeServices:
         print("Subscription updated:", item)
         return item
     
-    def create_stripe_upgrade_checkout(data):
+    def create_proration_checkout(data):
         try:
-            payload = {
-                "mode": "subscription",
-                "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
-                "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
-                "line_items[0][price]": data["priceId"],
-                "line_items[0][quantity]": "1",
-                "subscription_data[metadata][org_id]": data["org_id"],
-                "subscription_data[metadata][package_id]": data["package_id"],
-                "customer_update[name]": "auto",
-                "customer_update[address]": "auto",
-                "customer": get_customer_id_from_subscription(data["subscription_id"])
-            }
-            
+            # 1. Get current subscription details
             headers = {
                 "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
                 "Content-Type": "application/x-www-form-urlencoded",
             }
             
-            response = requests.post(
-                "https://api.stripe.com/v1/checkout/sessions",
-                headers=headers,
-                data=payload,
-            )
-            
-            if response.status_code == 200:
-                update_subscription_after_checkout(data["subscription_id"], response.json()["id"])
-                return response.json()
-            else:
-                response.raise_for_status()
-        except Exception as error:
-            print(f"Error creating Stripe Upgrade Checkout: {error}")
-            raise HTTPException(
-                status_code=400, detail=f"Stripe Upgrade Checkout failed: {error}"
-            )
-
-        def get_customer_id_from_subscription(subscription_id):
-            headers = {
-                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}"
-            }
             response = requests.get(
-                f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
+                f"https://api.stripe.com/v1/subscriptions/{data['subscription_id']}",
                 headers=headers
             )
-            if response.status_code == 200:
-                return response.json()["customer"]
-            else:
+            
+            if response.status_code != 200:
                 raise HTTPException(status_code=400, detail="Could not retrieve subscription")
-
-        def update_subscription_after_checkout(subscription_id, session_id):
-            headers = {
-                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
-                "Content-Type": "application/x-www-form-urlencoded",
+            
+            subscription = response.json()
+            subscription_item_id = subscription["items"]["data"][0]["id"]
+            customer_id = subscription["customer"]
+            
+            # 2. Create a preview of the prorated amount
+            preview_params = {
+                "subscription": data["subscription_id"],
+                "subscription_items[0][id]": subscription_item_id,
+                "subscription_items[0][price]": data["price_id"],
+                "subscription_items[0][quantity]": 1
             }
             
-            payload = {
-                "metadata[pending_upgrade_session]": session_id,
-                "cancel_at_period_end": "true" 
-            }
-            
-            requests.post(
-                f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
+            preview_response = requests.post(
+                "https://api.stripe.com/v1/subscription_items/preview",
                 headers=headers,
-                data=payload
+                data=preview_params
             )
-
+            
+            if preview_response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Failed to preview prorated charges")
+            
+            preview_data = preview_response.json()
+            prorated_amount = preview_data.get("proration_amount", 0)
+            
+            # 3. Create checkout session for the prorated amount
+            success_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page?upgrade_success=true"
+            cancel_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet?upgrade_cancelled=true"
+            
+            # If there is a prorated amount to pay
+            if prorated_amount > 0:
+                checkout_params = {
+                    "mode": "payment",
+                    "success_url": success_url,
+                    "cancel_url": cancel_url,
+                    "line_items[0][price_data][currency]": "usd",  # Adjust as needed
+                    "line_items[0][price_data][product_data][name]": "Plan Upgrade - Prorated Amount",
+                    "line_items[0][price_data][unit_amount]": prorated_amount,
+                    "line_items[0][quantity]": 1,
+                    "customer": customer_id,
+                    "payment_intent_data[metadata][subscription_id]": data["subscription_id"],
+                    "payment_intent_data[metadata][new_price_id]": data["price_id"],
+                    "payment_intent_data[metadata][org_id]": data["org_id"],
+                    "payment_intent_data[metadata][package_id]": data["package_id"],
+                }
+                
+                checkout_response = requests.post(
+                    "https://api.stripe.com/v1/checkout/sessions",
+                    headers=headers,
+                    data=checkout_params
+                )
+                
+                if checkout_response.status_code != 200:
+                    raise HTTPException(status_code=400, detail="Failed to create checkout session")
+                
+                return checkout_response.json().get("url")
+            
+            # If no prorated amount (free upgrade or downgrade with credit)
+            else:
+                # Immediate upgrade without payment
+                update_params = {
+                    "items[0][id]": subscription_item_id,
+                    "items[0][price]": data["price_id"],
+                    "metadata[org_id]": data["org_id"],
+                    "metadata[package_id]": data["package_id"],
+                }
+                
+                update_response = requests.post(
+                    f"https://api.stripe.com/v1/subscriptions/{data['subscription_id']}",
+                    headers=headers,
+                    data=update_params
+                )
+                
+                if update_response.status_code != 200:
+                    raise HTTPException(status_code=400, detail="Failed to update subscription")
+                
+                # Return success URL directly
+                return success_url
+        
+        except Exception as error:
+            print(f"Error in subscription upgrade process: {error}")
+            raise HTTPException(
+                status_code=400, detail=f"Subscription upgrade failed: {error}"
+            )

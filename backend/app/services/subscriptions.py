@@ -240,5 +240,5 @@ class SubscriptionServices:
             }
             print('checkoutdata', checkout_data)
             
-            checkout_session = StripeServices.create_stripe_upgrade_checkout(checkout_data)
+            checkout_session = StripeServices.create_proration_checkout(checkout_data)
             return checkout_session.get("url")
