@@ -8,13 +8,12 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core import security
 from app.core.config import settings
-from app.core.security import get_password_hash
+from app.core.security import create_jwt_token, get_password_hash
 from app.models.common import Message, NewPassword, UserToken
 from app.models.users import UserPublic
 from app.services.login import LoginServices
 from app.services.users import UserServices
 from app.utils import (
-    generate_password_reset_token,
     generate_reset_password_email,
     send_email,
     verify_password_reset_token,
@@ -40,8 +39,8 @@ def login_access_token(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return UserToken(
         user=UserPublic.model_validate(user),
-        access_token=security.create_access_token(
-            user.id, expires_delta=access_token_expires
+        access_token=security.create_jwt_token(
+            str(user.id), expires_delta=access_token_expires
         ),
     )
 
@@ -66,7 +65,8 @@ def recover_password(email: str, session: SessionDep) -> Message:
             status_code=404,
             detail="The user with this email does not exist in the system.",
         )
-    password_reset_token = generate_password_reset_token(email=email)
+    delta = timedelta(hours=settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS)
+    password_reset_token = create_jwt_token(payload=email, expires_delta=delta)
     email_data = generate_reset_password_email(
         email_to=user.email, email=email, token=password_reset_token
     )
@@ -117,7 +117,8 @@ def recover_password_html_content(email: str, session: SessionDep) -> Any:
             status_code=404,
             detail="The user with this username does not exist in the system.",
         )
-    password_reset_token = generate_password_reset_token(email=email)
+    delta = timedelta(hours=settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS)
+    password_reset_token = create_jwt_token(payload=email, expires_delta=delta)
     email_data = generate_reset_password_email(
         email_to=user.email, email=email, token=password_reset_token
     )

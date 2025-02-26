@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from app.core.security import decode_token, get_password_hash
 from app.models.models import Org, User
-from app.models.users import UserPublic, UserRegister, UserUpdate
+from app.models.users import Roles, UserPublic, UserRegister, UserUpdate
 
 
 class UserServices:
@@ -18,6 +18,7 @@ class UserServices:
                 update={
                     "password": get_password_hash(user_register.user.password),
                     "org_id": org_obj.id,
+                    "role": Roles.OWNER.value,
                 },
             )
             session.add(user_obj)
@@ -51,7 +52,7 @@ class UserServices:
 
     def verify_email_token(*, session: Session, token: str) -> UserRegister:
         token_data = decode_token(token=token)
-        user_register = UserRegister.model_validate(token_data.sub)
+        user_register = UserRegister.model_validate_json(token_data.sub)
         user = UserServices.get_user_by_email(
             session=session, email=user_register.user.email
         )

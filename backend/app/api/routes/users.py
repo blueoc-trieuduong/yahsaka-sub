@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,11 +10,23 @@ from app.api.deps import (
     SessionDep,
     get_current_active_superuser,
 )
-from app.core.security import get_password_hash, verify_password
-from app.models.common import EmailPayload, Message, VerifyEmailPayload
+from app.core.config import settings
+from app.core.security import (
+    create_jwt_token,
+    decode_token,
+    get_password_hash,
+    verify_password,
+)
+from app.models.common import (
+    EmailPayload,
+    InviteOrgPayload,
+    Message,
+    VerifyEmailPayload,
+)
 from app.models.models import Org, User
-from app.models.orgs import OrgInvitation
 from app.models.users import (
+    InviteOrgTokenPayload,
+    JoinOrgPayload,
     Roles,
     UpdatePassword,
     UserDetails,
@@ -26,7 +39,6 @@ from app.models.users import (
 from app.services.users import UserServices
 from app.utils import (
     generate_email_verify_email,
-    generate_email_verify_token,
     generate_invite_org_email,
     send_email,
 )
@@ -190,7 +202,10 @@ def register_user(session: SessionDep, payload: UserRegister) -> Message:
             status_code=400,
             detail="The user with this email already exists in the system",
         )
-    verify_token = generate_email_verify_token(payload=payload.model_dump())
+    verify_token = create_jwt_token(
+        payload=payload.model_dump_json(),
+        expires_delta=timedelta(hours=settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS),
+    )
     email_data = generate_email_verify_email(
         name=payload.user.first_name, token=verify_token
     )
@@ -202,17 +217,58 @@ def register_user(session: SessionDep, payload: UserRegister) -> Message:
     return Message(message="Email verification link sent")
 
 
+@router.post("/join-org", response_model=UserPublic)
+def join_org(
+    session: SessionDep,
+    payload: JoinOrgPayload,
+) -> UserPublic:
+    """
+    User join org by token and register to the system
+    """
+    token_data = decode_token(token=payload.token)
+    invite_org_payload = InviteOrgTokenPayload.model_validate_json(token_data.sub)
+    org_id = invite_org_payload.org_id
+    email = invite_org_payload.email
+
+    user = UserServices.get_user_by_email(session=session, email=email)
+
+    if user:
+        if user.org_id == org_id:
+            raise HTTPException(
+                status_code=400,
+                detail="The user is already in this org",
+            )
+        raise HTTPException(
+            status_code=400,
+            detail="The user already has an org",
+        )
+    user_obj = User.model_validate(
+        payload.user,
+        update={
+            "email": email,
+            "password": get_password_hash(payload.user.password),
+            "org_id": org_id,
+            "role": Roles.MEMBER.value,
+        },
+    )
+    session.add(user_obj)
+    session.commit()
+    session.refresh(user_obj)
+
+    return UserPublic.model_validate(user_obj)
+
+
 @router.post("/invite-org/{org_id}", response_model=Message)
 def invite_org(
     session: SessionDep,
     org_id: uuid.UUID,
     current_user: CurrentUser,
-    payload: OrgInvitation,
+    payload: InviteOrgPayload,
 ) -> Message:
     """
     Invite org by sending email to user
     """
-    if current_user.org_id != org_id or current_user.role != Roles.OWNER:
+    if current_user.org_id != org_id or current_user.role != Roles.OWNER.value:
         raise HTTPException(
             status_code=403,
             detail="The user doesn't have enough privileges to invite to this org",
@@ -231,8 +287,11 @@ def invite_org(
             detail="The user already has an org",
         )
 
-    verify_token = generate_email_verify_token(
-        payload={"email": payload.email, "org_id": str(org_id)}
+    verify_token = create_jwt_token(
+        payload=InviteOrgTokenPayload(
+            email=payload.email, org_id=org_id
+        ).model_dump_json(),
+        expires_delta=timedelta(hours=settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS),
     )
     email_data = generate_invite_org_email(
         org_name=current_user.org.name, token=verify_token

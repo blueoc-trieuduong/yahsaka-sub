@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 
-from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
 
@@ -34,7 +33,3 @@ class OrgUpdate(SQLModel):
 
 class OrgPublic(OrgBase):
     id: uuid.UUID
-
-
-class OrgInvitation(SQLModel):
-    email: EmailStr

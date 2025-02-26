@@ -1,7 +1,9 @@
+from uuid import UUID
+
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
-from app.models.users import UserPublic, UserRegister
+from app.models.users import UserPublic
 
 
 class Message(SQLModel):
@@ -17,8 +19,13 @@ class UserToken(Token):
     user: UserPublic
 
 
+class InviteOrgPayload(SQLModel):
+    email: EmailStr
+    org_id: UUID
+
+
 class TokenPayload(SQLModel):
-    sub: str | UserRegister | None = None
+    sub: str | None = None
 
 
 class NewPassword(SQLModel):
