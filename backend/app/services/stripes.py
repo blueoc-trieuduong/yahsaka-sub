@@ -132,20 +132,20 @@ class StripeServices:
             
             if response.status_code != 200:
                 raise HTTPException(status_code=400, detail="Could not retrieve subscription")
-            
+            print('res sucess')
             subscription = response.json()
             subscription_item_id = subscription["items"]["data"][0]["id"]
             customer_id = subscription["customer"]
             print('sub_item_id', subscription_item_id)
             print('cx id', customer_id)
-            
+            print('start')
             preview_params = {
                 "subscription": data["subscription_id"],
                 "subscription_items[0][id]": subscription_item_id,
                 "subscription_items[0][price]": data["price_id"],
                 "subscription_items[0][quantity]": 1
             }
-            
+            print('end')
             preview_response = requests.post(
                 "https://api.stripe.com/v1/subscription_items/preview",
                 headers=headers,
