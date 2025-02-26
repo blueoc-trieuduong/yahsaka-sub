@@ -157,8 +157,8 @@ class StripeServices:
             
             preview_data = preview_response.json()
             prorated_amount = sum(
-    item["amount"] for item in preview_data["lines"]["data"] if item.get("proration", False)
-)
+                item["amount"] for item in preview_data["lines"]["data"] if item.get("proration", False)
+            )
 
 
             print('previewData', preview_data)
@@ -196,9 +196,7 @@ class StripeServices:
                 
                 return checkout_response.json().get("url")
             
-            # If no prorated amount (free upgrade or downgrade with credit)
             else:
-                # Immediate upgrade without payment
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": data["price_id"],
@@ -215,7 +213,6 @@ class StripeServices:
                 if update_response.status_code != 200:
                     raise HTTPException(status_code=400, detail="Failed to update subscription")
                 
-                # Return success URL directly
                 return success_url
         
         except Exception as error:
