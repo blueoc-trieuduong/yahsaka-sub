@@ -173,11 +173,21 @@ class StripeServices:
                     "mode": "subscription",
                     "success_url": success_url,
                     "cancel_url": cancel_url,
-                    "line_items[0][price]": data["price_id"],
-                    "line_items[0][quantity]": 1,
-                    "subscription_data[proration_behavior]": "create_prorations",
-                    "metadata[org_id]": data["org_id"],
-                    "metadata[package_id]": data["package_id"],
+                    "customer": customer_id,  
+                    "subscription_data": {
+                        "subscription": data["subscription_id"],  
+                        "proration_behavior": "create_prorations" 
+                    },
+                    "line_items": [
+                        {
+                            "price": data["price_id"],  
+                            "quantity": 1
+                        }
+                    ],
+                    "metadata": {
+                        "org_id": data["org_id"],
+                        "package_id": data["package_id"]
+                    }
                 }
 
 
