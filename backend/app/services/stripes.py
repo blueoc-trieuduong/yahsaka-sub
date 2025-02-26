@@ -136,24 +136,22 @@ class StripeServices:
             subscription = response.json()
             subscription_item_id = subscription["items"]["data"][0]["id"]
             customer_id = subscription["customer"]
-            print('sub_item_id', subscription_item_id)
-            print('cx id', customer_id)
-            print('start')
             preview_params = {
                 "subscription": data["subscription_id"],
                 "subscription_items[0][id]": subscription_item_id,
                 "subscription_items[0][price]": data["price_id"],
                 "subscription_items[0][quantity]": 1
             }
-            print('end')
+            print('loi o day ne')
             preview_response = requests.post(
                 "https://api.stripe.com/v1/subscription_items/preview",
                 headers=headers,
                 data=preview_params
             )
+            print('preview_res', preview_response)
             
             if preview_response.status_code != 200:
-                raise HTTPException(status_code=400, detail="Failed to preview prorated charges")
+                raise HTTPException(400, detail="Failed to preview prorated charges")
             
             preview_data = preview_response.json()
             prorated_amount = preview_data.get("proration_amount", 0)
@@ -163,16 +161,15 @@ class StripeServices:
 
 
             
-            success_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page?upgrade_success=true"
+            success_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page"
             cancel_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet?upgrade_cancelled=true"
             
-            # If there is a prorated amount to pay
             if prorated_amount > 0:
                 checkout_params = {
                     "mode": "payment",
                     "success_url": success_url,
                     "cancel_url": cancel_url,
-                    "line_items[0][price_data][currency]": "usd",  # Adjust as needed
+                    "line_items[0][price_data][currency]": "usd",  
                     "line_items[0][price_data][product_data][name]": "Plan Upgrade - Prorated Amount",
                     "line_items[0][price_data][unit_amount]": prorated_amount,
                     "line_items[0][quantity]": 1,
