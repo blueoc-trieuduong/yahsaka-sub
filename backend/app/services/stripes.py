@@ -126,10 +126,11 @@ class StripeServices:
                 "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
                 "line_items[0][price]": data["priceId"],
                 "line_items[0][quantity]": "1",
-                "subscription_data[transfer_existing_items]": "true",
-                "subscription_data[subscription]": data["subscription_id"],
-                "metadata[org_id]": data["org_id"],
-                "metadata[package_id]": data["package_id"],
+                "subscription_data[metadata][org_id]": data["org_id"],
+                "subscription_data[metadata][package_id]": data["package_id"],
+                "customer_update[name]": "auto",
+                "customer_update[address]": "auto",
+                "customer": get_customer_id_from_subscription(data["subscription_id"])
             }
             
             headers = {
@@ -144,6 +145,7 @@ class StripeServices:
             )
             
             if response.status_code == 200:
+                update_subscription_after_checkout(data["subscription_id"], response.json()["id"])
                 return response.json()
             else:
                 response.raise_for_status()
@@ -152,5 +154,34 @@ class StripeServices:
             raise HTTPException(
                 status_code=400, detail=f"Stripe Upgrade Checkout failed: {error}"
             )
-        
+
+        def get_customer_id_from_subscription(subscription_id):
+            headers = {
+                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}"
+            }
+            response = requests.get(
+                f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
+                headers=headers
+            )
+            if response.status_code == 200:
+                return response.json()["customer"]
+            else:
+                raise HTTPException(status_code=400, detail="Could not retrieve subscription")
+
+        def update_subscription_after_checkout(subscription_id, session_id):
+            headers = {
+                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+            
+            payload = {
+                "metadata[pending_upgrade_session]": session_id,
+                "cancel_at_period_end": "true" 
+            }
+            
+            requests.post(
+                f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
+                headers=headers,
+                data=payload
+            )
 
