@@ -14,16 +14,23 @@ class StripeServices:
     def create_stripe_checkout(data):
         try:
             print('dataSession', data)
+        #       payload = {
+        #     "mode": "subscription",
+        #     "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
+        #     "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
+        #     "line_items[0][price]": data["priceId"], 
+        #     "line_items[0][quantity]": "1",
+      
+        #     "metadata[org_id]": data["org_id"],
+        #     "metadata[package_id]": data["package_id"],
+        # }
+            
             payload = {
                 "mode": "subscription",
                 "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
                 "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
-                "line_items": [
-                    {
-                        "price": data["priceId"],
-                        "quantity": 1
-                    }
-                ],
+                "line_items[0][price]": data["priceId"], 
+                "line_items[0][quantity]": "1",
                 "metadata": {
                     "org_id": data["org_id"],
                     "package_id": data["package_id"]
