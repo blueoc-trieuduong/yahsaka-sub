@@ -137,18 +137,19 @@ class StripeServices:
             subscription_item_id = subscription["items"]["data"][0]["id"]
             customer_id = subscription["customer"]
             preview_params = {
+                "customer": customer_id,
                 "subscription": data["subscription_id"],
                 "subscription_items[0][id]": subscription_item_id,
-                "subscription_items[0][price]": data["price_id"],
-                "subscription_items[0][quantity]": 1
+                "subscription_items[0][price]": data["price_id"]
             }
-            
-            preview_response = requests.post(
-                "https://api.stripe.com/v1/subscription_items/preview",
+            print('ready battle')
+            preview_response = requests.get(
+                "https://api.stripe.com/v1/invoices/upcoming",
                 headers=headers,
-                data=preview_params
+                params=preview_params
             )
-         
+
+
             
             if preview_response.status_code != 200:
                 print('loi o day ne')
