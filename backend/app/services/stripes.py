@@ -139,7 +139,6 @@ class StripeServices:
                 "subscription": data["subscription_id"],
                 "subscription_items[0][id]": subscription_item_id,
                 "subscription_items[0][price]": data["price_id"],
-                "billing_cycle_anchor": "now"
             }
             print('ready battle')
             preview_response = requests.get(
