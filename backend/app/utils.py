@@ -148,7 +148,7 @@ def generate_email_verify_token(payload: UserRegister) -> str:
     expires = now + delta
     exp = expires.timestamp()
     encoded_jwt = jwt.encode(
-        {"exp": exp, "nbf": now, "sub": payload.model_dump()},
+        {"exp": exp, "nbf": now, "sub": payload.model_dump_json()},
         settings.SECRET_KEY,
         algorithm=security.ALGORITHM,
     )

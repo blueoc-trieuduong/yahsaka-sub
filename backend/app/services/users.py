@@ -51,7 +51,7 @@ class UserServices:
 
     def verify_email_token(*, session: Session, token: str) -> UserRegister:
         token_data = decode_token(token=token)
-        user_register = UserRegister.model_validate(token_data.sub)
+        user_register = UserRegister.model_validate_json(token_data.sub)
         user = UserServices.get_user_by_email(
             session=session, email=user_register.user.email
         )
