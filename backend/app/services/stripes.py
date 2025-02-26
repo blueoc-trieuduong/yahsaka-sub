@@ -170,19 +170,17 @@ class StripeServices:
             if prorated_amount > 0:
                 print('inIf')
                 checkout_params = {
-                    "mode": "payment",
+                    "mode": "subscription",
                     "success_url": success_url,
                     "cancel_url": cancel_url,
-                    "line_items[0][price_data][currency]": "usd",  
-                    "line_items[0][price_data][product_data][name]": "Plan Upgrade - Prorated Amount",
-                    "line_items[0][price_data][unit_amount]": prorated_amount,
+                    "line_items[0][price]": data["price_id"],
                     "line_items[0][quantity]": 1,
-                    "customer": customer_id,
-                    "payment_intent_data[metadata][subscription_id]": data["subscription_id"],
-                    "payment_intent_data[metadata][new_price_id]": data["price_id"],
-                    "payment_intent_data[metadata][org_id]": data["org_id"],
-                    "payment_intent_data[metadata][package_id]": data["package_id"],
+                    "subscription_data[proration_behavior]": "create_prorations",
+                    "metadata[org_id]": data["org_id"],
+                    "metadata[package_id]": data["package_id"],
                 }
+
+
                 print('outif')
                 
                 checkout_response = requests.post(
