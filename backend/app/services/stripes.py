@@ -20,8 +20,6 @@ class StripeServices:
             "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
             "line_items[0][price]": data["priceId"], 
             "line_items[0][quantity]": "1",
-            # "subscription_data[trial_from_plan]": "false",
-            # "subscription_data[proration_behavior]": "create_prorations",  
             "metadata[org_id]": data["org_id"],
             "metadata[package_id]": data["package_id"],
         }
@@ -140,7 +138,8 @@ class StripeServices:
                 "customer": customer_id,
                 "subscription": data["subscription_id"],
                 "subscription_items[0][id]": subscription_item_id,
-                "subscription_items[0][price]": data["price_id"]
+                "subscription_items[0][price]": data["price_id"],
+                "billing_cycle_anchor": "now"
             }
             print('ready battle')
             preview_response = requests.get(
@@ -151,7 +150,6 @@ class StripeServices:
 
             
             if preview_response.status_code != 200:
-                print('loi o day ne')
                 print(preview_response.status_code)
                 raise HTTPException(status_code=400, detail="Failed to preview prorated charges")
             
@@ -169,12 +167,20 @@ class StripeServices:
             print('preIf')
             if prorated_amount > 0:
                 print('inIf')
+                subscription_items = subscription["items"]["data"]
+
+                subscription_items_sorted = sorted(subscription_items, key=lambda x: x["plan"]["amount"])
+
+                old_plan_name = subscription_items_sorted[0]["plan"]["nickname"]
+
+                new_plan_name = subscription_items_sorted[-1]["plan"]["nickname"]
+
                 checkout_params = {
                     "mode": "payment",
                     "success_url": success_url,
                     "cancel_url": cancel_url,
-                    "line_items[0][price_data][currency]": "usd",  
-                    "line_items[0][price_data][product_data][name]": "Plan Upgrade - Prorated Amount",
+                    "line_items[0][price_data][currency]": "usd",
+                    "line_items[0][price_data][product_data][name]": f"{old_plan_name} → {new_plan_name}",  # Cập nhật tên
                     "line_items[0][price_data][unit_amount]": prorated_amount,
                     "line_items[0][quantity]": 1,
                     "customer": customer_id,
@@ -183,6 +189,7 @@ class StripeServices:
                     "payment_intent_data[metadata][org_id]": data["org_id"],
                     "payment_intent_data[metadata][package_id]": data["package_id"],
                 }
+
                 print('outif')
                 
                 checkout_response = requests.post(
