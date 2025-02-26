@@ -10,6 +10,7 @@ from app.models.users import Roles, UserPublic, UserRegister, UserUpdate
 
 class UserServices:
     def register_user(*, session: Session, user_register: UserRegister) -> UserPublic:
+        UserServices.check_register_user(session=session, user_register=user_register)
         try:
             org_obj = Org.model_validate(user_register.org)
             session.add(org_obj)
@@ -58,7 +59,41 @@ class UserServices:
         )
         if user:
             raise HTTPException(
-                status_code=400,
+                status_code=409,
                 detail="The user with this email already exists in the system",
             )
         return user_register
+
+    def check_register_user(*, session: Session, user_register: UserRegister) -> None:
+        existing_user = UserServices.get_user_by_email(
+            session=session, email=user_register.user.email
+        )
+        if existing_user:
+            raise HTTPException(
+                status_code=409,
+                detail="The user with this email already exists in the system",
+            )
+
+        existing_user = session.exec(
+            select(User).where(User.phone_number == user_register.user.phone_number)
+        ).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=409, detail="User with this phone number already exists"
+            )
+
+        existing_org = session.exec(
+            select(Org).where(Org.slug == user_register.org.slug)
+        ).first()
+        if existing_org:
+            raise HTTPException(
+                status_code=409, detail="Org with this slug already exists"
+            )
+
+        existing_org = session.exec(
+            select(Org).where(Org.company_prefix == user_register.org.company_prefix)
+        ).first()
+        if existing_org:
+            raise HTTPException(
+                status_code=409, detail="Org with this prefix already exists"
+            )

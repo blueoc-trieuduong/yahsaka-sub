@@ -172,7 +172,7 @@ def check_email(session: SessionDep, payload: EmailPayload) -> Message:
     user = UserServices.get_user_by_email(session=session, email=payload.email)
     if user:
         raise HTTPException(
-            status_code=400,
+            status_code=409,
             detail="The user with this email already exists in the system",
         )
     return Message(message="Email is valid")
@@ -195,13 +195,8 @@ def register_user(session: SessionDep, payload: UserRegister) -> Message:
     """
     Register user by sending email verfification
     """
-    user = UserServices.get_user_by_email(session=session, email=payload.user.email)
+    UserServices.check_register_user(session=session, user_register=payload)
 
-    if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this email already exists in the system",
-        )
     verify_token = create_jwt_token(
         payload=payload.model_dump_json(),
         expires_delta=timedelta(hours=settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS),
