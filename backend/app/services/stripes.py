@@ -20,8 +20,7 @@ class StripeServices:
             "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
             "line_items[0][price]": data["priceId"], 
             "line_items[0][quantity]": "1",
-            # "subscription_data[trial_from_plan]": "false",
-            # "subscription_data[proration_behavior]": "create_prorations",  
+      
             "metadata[org_id]": data["org_id"],
             "metadata[package_id]": data["package_id"],
         }
@@ -170,17 +169,19 @@ class StripeServices:
             if prorated_amount > 0:
                 print('inIf')
                 checkout_params = {
-                        "mode": "payment",
-                        "success_url": success_url,
-                        "cancel_url": cancel_url,
-                        "line_items[0][price_data][currency]": "usd",  
-                        "line_items[0][price_data][product_data][name]": "Plan Upgrade - Prorated Amount",
-                        "line_items[0][price_data][unit_amount]": prorated_amount,
-                        "line_items[0][quantity]": 1,
-                        "customer": customer_id,
-                        "metadata[org_id]": data["org_id"],  
-                        "metadata[package_id]": data["package_id"], 
-                    }
+                    "mode": "payment",
+                    "success_url": success_url,
+                    "cancel_url": cancel_url,
+                    "line_items[0][price_data][currency]": "usd",
+                    "line_items[0][price_data][product_data][name]": "Plan Upgrade - Prorated Amount",
+                    "line_items[0][price_data][unit_amount]": prorated_amount,
+                    "line_items[0][quantity]": 1,
+                    "customer": customer_id,
+                    "metadata[subscription_id]": data["subscription_id"],
+                    "metadata[org_id]": data["org_id"],
+                    "metadata[package_id]": data["package_id"],
+                    "metadata[new_price_id]": data["price_id"]
+                }
 
 
 
