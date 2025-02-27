@@ -389,7 +389,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 )
                 return {"status": "success", "subscription_id": new_subscription.id}
         
-        # Handle subscription updates
         elif event.get("type") == "customer.subscription.updated":
             subscription_id = event["data"]["object"]["id"]
             status = event["data"]["object"]["status"]
@@ -401,11 +400,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             
             if subscription:
                 if status == "active":
-                    subscription.status = Status.ACTIVE
+                    subscription.status = Status.ACTIVE.value
                 elif status == "canceled":
-                    subscription.status = Status.CANCELED
+                    subscription.status = Status.CANCELED.value
                 else:
-                    subscription.status = Status.PENDING
+                    subscription.status = Status.PENDING.value
                 subscription.updated_at = datetime.now()
                 session.commit()
                 
@@ -423,7 +422,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
             
             if subscription:
-                subscription.status = Status.CANCELED
+                subscription.status = Status.CANCELED.value
                 subscription.unsubscribe_at = datetime.now()
                 session.commit()
                 
@@ -445,7 +444,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             subscription = result.first()
             
             if subscription:
-                subscription.status = Status.ACTIVE
+                subscription.status = Status.ACTIVE.value
                 subscription.updated_at = datetime.now()
                 session.commit()
                 
