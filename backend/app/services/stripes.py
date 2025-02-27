@@ -195,6 +195,7 @@ class StripeServices:
                     "metadata[org_id]": data["org_id"],
                     "metadata[package_id]": data["package_id"],
                     "metadata[new_price_id]": data["price_id"]
+                    
                 }
 
 
@@ -223,6 +224,7 @@ class StripeServices:
                     "items[0][price]": data["price_id"],
                     "metadata[org_id]": data["org_id"],
                     "metadata[package_id]": data["package_id"],
+                    "proration_behavior": "none",
                 }
                 
                 update_response = requests.post(

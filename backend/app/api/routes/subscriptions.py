@@ -318,7 +318,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             org_id = metadata.get("org_id")
             package_id = metadata.get("package_id")
             
-            # Check if this is a subscription upgrade
             if metadata.get("subscription_id") and metadata.get("new_price_id"):
                 subscription_id = metadata["subscription_id"]
                 new_price_id = metadata["new_price_id"]
@@ -368,7 +367,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 
                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
             else:
-                # Handle new subscription creation
                 if not subscription_id:
                     return {"status": "no subscription found in session"}
                     
