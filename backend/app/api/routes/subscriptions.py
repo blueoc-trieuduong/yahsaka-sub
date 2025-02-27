@@ -341,6 +341,8 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": new_price_id,
+                    "proration_behavior": "none",
+                    "billing_cycle_anchor": "unchanged"
                 }
                 
                 update_response = requests.post(
