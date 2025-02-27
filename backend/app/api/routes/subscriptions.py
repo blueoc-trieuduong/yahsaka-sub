@@ -361,9 +361,9 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 ).first()
                 print('sub ne', subscription_db)
                 print('pre sub ne', subscription_db.status)
-                print('status ne', Status.UPGRADED)
+                print('status ne', Status.UPGRADED.value)
                 if subscription_db:
-                    subscription_db.status = Status.UPGRADED
+                    subscription_db.status = Status.UPGRADED.value
                     subscription_db.updated_at = datetime.now()
                     session.commit()
                 
