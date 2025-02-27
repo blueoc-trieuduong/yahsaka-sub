@@ -399,19 +399,22 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
             
             if subscription:
-                if status == "active":
-                    subscription.status = Status.ACTIVE.value
-                elif status == "canceled":
-                    subscription.status = Status.CANCELED.value
-                else:
-                    subscription.status = Status.PENDING.value
-                subscription.updated_at = datetime.now()
-                session.commit()
-                
+                # Chỉ cập nhật nếu trạng thái hiện tại không phải là UPGRADED
+                if subscription.status != Status.UPGRADED.value:
+                    if status == "active":
+                        subscription.status = Status.ACTIVE.value
+                    elif status == "canceled":
+                        subscription.status = Status.CANCELED.value
+                    else:
+                        subscription.status = Status.PENDING.value
+                    subscription.updated_at = datetime.now()
+                    session.commit()
+
             return {
                 "status": "subscription updated",
                 "subscription_id": subscription.id if subscription else None,
             }
+
         
         elif event.get("type") == "customer.subscription.deleted":
             subscription_id = event["data"]["object"]["id"]
@@ -431,7 +434,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 "subscription_id": subscription.id if subscription else None,
             }
         
-        # Handle successful invoice payments
         elif event.get("type") == "invoice.payment_succeeded":
             subscription_id = event["data"]["object"]["subscription"]
             if not subscription_id:
