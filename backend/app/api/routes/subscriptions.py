@@ -366,6 +366,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     print('in hereeeee')
                     subscription_db.status = Status.UPGRADED.value
                     subscription_db.updated_at = datetime.now()
+                    session.add(subscription_db)
                     session.commit()
                 
                 new_subscription = SubscriptionServices.create_subscription_from_stripe(
