@@ -354,7 +354,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 if update_response.status_code != 200:
                     raise Exception(f"Failed to update subscription: {update_response.text}")
                 
-                # Update subscription in database
                 subscription_db = session.exec(
                     select(Subscription).where(
                         Subscription.stripe_sub_id == subscription_id
@@ -362,10 +361,16 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 ).first()
                 
                 if subscription_db:
-                    subscription_db.package_id = package_id
                     subscription_db.status = Status.UPGRADED
                     subscription_db.updated_at = datetime.now()
                     session.commit()
+                
+                new_subscription = SubscriptionServices.create_subscription_from_stripe(
+                    session=session,
+                    stripe_sub_id=subscription_id,
+                    org_id=org_id,
+                    package_id=package_id,
+                )
                 
                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
             else:
@@ -405,7 +410,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 "subscription_id": subscription.id if subscription else None,
             }
         
-        # Handle subscription deletions
         elif event.get("type") == "customer.subscription.deleted":
             subscription_id = event["data"]["object"]["id"]
             subscription = session.exec(
