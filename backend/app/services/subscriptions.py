@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
 from uuid import UUID
+import requests
 from dateutil.relativedelta import relativedelta
 from fastapi import HTTPException
 from sqlmodel import Session, desc, func, select
-
+from app.core.config import settings
 from app.api.deps import SessionDep
 from app.models.models import Package, Subscription
 from app.models.subscriptions import (
@@ -55,9 +56,6 @@ class SubscriptionServices:
     ) -> SubscriptionCreate:
         try:
             print('createSub access')
-            print('stripe_sup_id', stripe_sub_id)
-            print('org_id', org_id)
-            print('pacakge_id', package_id)
 
             new_subscription = Subscription(
                 stripe_sub_id=stripe_sub_id,
@@ -126,56 +124,87 @@ class SubscriptionServices:
         
 
     def downgrade_subscription(
-        *, session: Session, current_subscription: Subscription, new_package_id: str
+    *, session: Session, current_subscription: Subscription, new_package_id: str
     ) -> SubscriptionPublic:
+        headers = {
+            "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
         statement = select(Package).where(Package.id == new_package_id)
         new_package = session.exec(statement).first()
-
         if not new_package:
             raise HTTPException(status_code=404, detail="Package not found")
-        
-        new_active_date = current_subscription.expired_date + timedelta(days=1)
-        new_expired_date = new_active_date + relativedelta(months=1)
 
-        subscription_create = SubscriptionCreate(
-            org_id=current_subscription.org_id,
-            package_id=new_package_id,
-            status=Status.PENDING,
-            active_date=new_active_date,
-            expired_date=new_expired_date,
+        stripe_sub_id = current_subscription.stripe_sub_id
+        print('stripe_sub_id', stripe_sub_id)
+        stripe_subscription_response = requests.get(
+            f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
+            headers=headers,
+        )
+        
+        if stripe_subscription_response.status_code != 200:
+            raise Exception(f"Failed to get subscription from Stripe: {stripe_subscription_response.text}")
+
+        stripe_subscription = stripe_subscription_response.json()
+        subscription_item_id = stripe_subscription["items"]["data"][0]["id"]
+
+        update_params = {
+            "items[0][id]": subscription_item_id,
+            "items[0][price]": new_package.stripe_price_id,  
+            "proration_behavior": "none", 
+            "billing_cycle_anchor": "unchanged",  
+        }
+
+        update_response = requests.post(
+            f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
+            headers=headers,
+            data=update_params,
         )
 
-        new_subscription = Subscription.model_validate(subscription_create.model_dump())
+        if update_response.status_code != 200:
+            raise Exception(f"Failed to update subscription: {update_response.text}")
 
-        session.add(new_subscription)
+        current_subscription.status = Status.DOWNGRADED
+        current_subscription.package_id = new_package_id
+        current_subscription.updated_at = datetime.utcnow()
+
+        session.add(current_subscription)
         session.commit()
-        session.refresh(new_subscription)
+        session.refresh(current_subscription)
 
-        return SubscriptionPublic.model_validate(new_subscription)
+        return SubscriptionPublic.model_validate(current_subscription)
+
 
     def get_current_active_subscription(
-    *, session: Session, org_id: UUID
+    *, session: Session, org_id: UUID, isActive: bool
     ) -> SubscriptionPublic:
         try:
-            print('org_id', org_id)
+            now = datetime.utcnow()
+
+            if isActive:
+                status_filter = [Status.ACTIVE, Status.CANCELED] 
+            else:
+                status_filter = [Status.PENDING]
+
             statement = select(Subscription).where(
                 Subscription.org_id == org_id,
-                Subscription.status == Status.ACTIVE,
-            ).order_by(desc(Subscription.created_at))  
+                Subscription.status.in_(status_filter),
+                Subscription.expired_date >= now  
+            ).order_by(desc(Subscription.created_at))
 
-            active_subscription = session.exec(statement).first()
-            print('actSub', active_subscription)
-            if not active_subscription:
+            subscription = session.exec(statement).first()
+            if not subscription:
                 raise HTTPException(
-                    status_code=404, detail="No active subscription found for this user"
+                    status_code=404, detail=f"No valid {status_filter} subscription found for this user"
                 )
-            return SubscriptionPublic.model_validate(active_subscription)
+            return SubscriptionPublic.model_validate(subscription)
+
         except Exception as e:
             raise HTTPException(
-                status_code=500, detail=f"Error fetching subscription and package: {e}"
+                status_code=500, detail=f"Error fetching subscription: {e}"
             )
         
-    def get_current_active_subscription_after(
+    def get_new_subscription(
     *, session: Session, org_id: UUID
     ) -> SubscriptionPublic:
         try:
@@ -196,8 +225,6 @@ class SubscriptionServices:
             raise HTTPException(
                 status_code=500, detail=f"Error fetching subscription and package: {e}"
             )    
-
-            
 
     def get_subscription_history(
         *, session: Session, org_id: UUID, page_index: int = 0, page_size: int = 10
