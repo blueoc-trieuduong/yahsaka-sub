@@ -204,6 +204,36 @@ class SubscriptionServices:
                 status_code=500, detail=f"Error fetching subscription: {e}"
             )
         
+
+    def get_next_subscription(
+    *, session: Session, org_id: UUID, isActive: bool
+    ) -> SubscriptionPublic:
+        try:
+            now = datetime.utcnow()
+
+            if isActive:
+                status_filter = [Status.ACTIVE, Status.CANCELED] 
+            else:
+                status_filter = [Status.PENDING]
+
+            statement = select(Subscription).where(
+                Subscription.org_id == org_id,
+                Subscription.status.in_(status_filter),
+                Subscription.expired_date >= now  
+            ).order_by(desc(Subscription.created_at))
+
+            subscription = session.exec(statement).first()
+            if not subscription:
+                raise HTTPException(
+                    status_code=404, detail=f"No valid {status_filter} subscription found for this user"
+                )
+            return SubscriptionPublic.model_validate(subscription)
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching subscription: {e}"
+            )    
+        
     def get_new_subscription(
     *, session: Session, org_id: UUID
     ) -> SubscriptionPublic:

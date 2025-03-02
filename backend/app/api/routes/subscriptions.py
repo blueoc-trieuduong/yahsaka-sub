@@ -30,15 +30,16 @@ def get_current_subscription(
     )
 
 @router.get("/next", response_model=SubscriptionPublic)
-def get_current_subscription(
+def get_next_subscription(
     current_user: CurrentUser, session: SessionDep
 ) -> SubscriptionPublic:
-    return SubscriptionServices.get_current_active_subscription(
+    return SubscriptionServices.get_next_subscription(
         session=session, org_id=current_user.org_id
     )    
 
+
 @router.get("/new", response_model=SubscriptionPublic)
-def get_current_subscription(
+def get_new_subscription(
     current_user: CurrentUser, session: SessionDep
 ) -> SubscriptionPublic:
     return SubscriptionServices.get_new_subscription(
