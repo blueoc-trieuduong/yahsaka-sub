@@ -24,22 +24,9 @@ class StripeServices:
             "metadata[org_id]": data["org_id"],
             "metadata[package_id]": data["package_id"],
          }
-            
-            # payload = {
-            #     "mode": "subscription",
-            #     "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
-            #     "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
-            #     "line_items[0][price]": data["priceId"], 
-            #       "line_items[0][quantity]": "1",
-            #     "metadata": {
-            #         "org_id": data["org_id"],
-            #         "package_id": data["package_id"]
-            #     }
-            # }
     
             print("Payload gửi đến Stripe:", payload)
       
-
             headers = {
                 "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -155,7 +142,6 @@ class StripeServices:
                 "subscription_items[0][id]": subscription_item_id,
                 "subscription_items[0][price]": data["price_id"]
             }
-            print('ready battle')
             preview_response = requests.get(
                 "https://api.stripe.com/v1/invoices/upcoming",
                 headers=headers,
@@ -197,11 +183,7 @@ class StripeServices:
                     "metadata[new_price_id]": data["price_id"]
                     
                 }
-
-
-
                 print('outif')
-                
                 checkout_response = requests.post(
                     "https://api.stripe.com/v1/checkout/sessions",
                     headers=headers,

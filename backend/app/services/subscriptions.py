@@ -124,65 +124,67 @@ class SubscriptionServices:
 
     def downgrade_subscription(
     *, session: Session, current_subscription: Subscription, new_package_id: str
-        ) -> SubscriptionPublic:
-            headers = {
-                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            }
+    ) -> SubscriptionPublic:
+        headers = {
+            "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
 
-            statement = select(Package).where(Package.id == new_package_id)
-            new_package = session.exec(statement).first()
-            if not new_package:
-                raise HTTPException(status_code=404, detail="Package not found")
+        # 🔹 Lấy thông tin package mới từ DB
+        statement = select(Package).where(Package.id == new_package_id)
+        new_package = session.exec(statement).first()
+        if not new_package:
+            raise HTTPException(status_code=404, detail="Package not found")
 
-            stripe_sub_id = current_subscription.stripe_sub_id
-            print('stripe_sub_id', stripe_sub_id)
+        stripe_sub_id = current_subscription.stripe_sub_id
+        print('stripe_sub_id', stripe_sub_id)
 
-            stripe_subscription_response = requests.get(
-                f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
-                headers=headers,
-            )
+        # 🔹 Lấy thông tin subscription hiện tại từ Stripe
+        stripe_subscription_response = requests.get(
+            f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
+            headers=headers,
+        )
 
-            if stripe_subscription_response.status_code != 200:
-                raise Exception(f"Failed to get subscription from Stripe: {stripe_subscription_response.text}")
+        if stripe_subscription_response.status_code != 200:
+            raise Exception(f"Failed to get subscription from Stripe: {stripe_subscription_response.text}")
 
-            stripe_subscription = stripe_subscription_response.json()
+        stripe_subscription = stripe_subscription_response.json()
+        subscription_item_id = stripe_subscription["items"]["data"][0]["id"]
 
-            create_params = {
-                "customer": stripe_subscription["customer"],
-                "items[0][price]": new_package.stripe_price_id,
-                "billing_cycle_anchor": "unchanged",  
-                "proration_behavior": "none",  
-            }
-            print('create_params', create_params)
+        update_params = {
+            "items[0][id]": subscription_item_id,
+            "items[0][price]": new_package.stripe_price_id,
+            "proration_behavior": "none",  # Không tính tiền ngay
+            "billing_cycle_anchor": "unchanged"  # 🔥 Dùng được vì đang UPDATE subscription
+        }
 
-            create_response = requests.post(
-                f"https://api.stripe.com/v1/subscriptions",
-                headers=headers,
-                data=create_params,
-            )
-            print('res downgradee', create_response.json())
+        update_response = requests.post(
+            f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
+            headers=headers,
+            data=update_params,
+        )
 
-            if create_response.status_code != 200:
-                raise Exception(f"Failed to create new subscription on Stripe: {create_response.text}")
+        print('res downgrade', update_response.json())
 
-            new_stripe_subscription = create_response.json()
-            new_stripe_sub_id = new_stripe_subscription["id"]
+        if update_response.status_code != 200:
+            raise Exception(f"Failed to update subscription on Stripe: {update_response.text}")
 
-            new_subscription = Subscription(
-                org_id=current_subscription.org_id,
-                package_id=new_package_id,
-                stripe_sub_id=new_stripe_sub_id,  
-                status=Status.PENDING,  
-                active_date=current_subscription.expired_date + timedelta(days=1),
-                expired_date=current_subscription.expired_date + relativedelta(months=1),
-            )
+        # 🔹 Chỉ tạo mới trong DB, giữ nguyên Stripe Subscription
+        new_subscription = Subscription(
+            org_id=current_subscription.org_id,
+            package_id=new_package_id,
+            stripe_sub_id=stripe_sub_id,  # Vẫn dùng ID cũ
+            status=Status.PENDING,  
+            active_date=current_subscription.expired_date + timedelta(days=1),
+            expired_date=current_subscription.expired_date + relativedelta(months=1),
+        )
 
-            session.add(new_subscription)
-            session.commit()
-            session.refresh(new_subscription)
+        session.add(new_subscription)
+        session.commit()
+        session.refresh(new_subscription)
 
-            return SubscriptionPublic.model_validate(new_subscription)
+        return SubscriptionPublic.model_validate(new_subscription)
+
 
 
 
