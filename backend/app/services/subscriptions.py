@@ -121,58 +121,67 @@ class SubscriptionServices:
                 status_code=500,
                 detail=f"Unexpected error during subscription update: {e}",
             )
-        
 
     def downgrade_subscription(
     *, session: Session, current_subscription: Subscription, new_package_id: str
-    ) -> SubscriptionPublic:
-        headers = {
-            "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-        statement = select(Package).where(Package.id == new_package_id)
-        new_package = session.exec(statement).first()
-        if not new_package:
-            raise HTTPException(status_code=404, detail="Package not found")
+        ) -> SubscriptionPublic:
+            headers = {
+                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
 
-        stripe_sub_id = current_subscription.stripe_sub_id
-        print('stripe_sub_id', stripe_sub_id)
-        stripe_subscription_response = requests.get(
-            f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
-            headers=headers,
-        )
-        
-        if stripe_subscription_response.status_code != 200:
-            raise Exception(f"Failed to get subscription from Stripe: {stripe_subscription_response.text}")
+            statement = select(Package).where(Package.id == new_package_id)
+            new_package = session.exec(statement).first()
+            if not new_package:
+                raise HTTPException(status_code=404, detail="Package not found")
 
-        stripe_subscription = stripe_subscription_response.json()
-        subscription_item_id = stripe_subscription["items"]["data"][0]["id"]
+            stripe_sub_id = current_subscription.stripe_sub_id
+            print('stripe_sub_id', stripe_sub_id)
 
-        update_params = {
-            "items[0][id]": subscription_item_id,
-            "items[0][price]": new_package.stripe_price_id,  
-            "proration_behavior": "none", 
-            "billing_cycle_anchor": "unchanged",  
-        }
+            stripe_subscription_response = requests.get(
+                f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
+                headers=headers,
+            )
 
-        update_response = requests.post(
-            f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
-            headers=headers,
-            data=update_params,
-        )
+            if stripe_subscription_response.status_code != 200:
+                raise Exception(f"Failed to get subscription from Stripe: {stripe_subscription_response.text}")
 
-        if update_response.status_code != 200:
-            raise Exception(f"Failed to update subscription: {update_response.text}")
+            stripe_subscription = stripe_subscription_response.json()
 
-        current_subscription.status = Status.DOWNGRADED
-        current_subscription.package_id = new_package_id
-        current_subscription.updated_at = datetime.utcnow()
+            create_params = {
+                "customer": stripe_subscription["customer"],
+                "items[0][price]": new_package.stripe_price_id,
+                "billing_cycle_anchor": "unchanged",  
+                "proration_behavior": "none",  
+            }
 
-        session.add(current_subscription)
-        session.commit()
-        session.refresh(current_subscription)
+            create_response = requests.post(
+                f"https://api.stripe.com/v1/subscriptions",
+                headers=headers,
+                data=create_params,
+            )
 
-        return SubscriptionPublic.model_validate(current_subscription)
+            if create_response.status_code != 200:
+                raise Exception(f"Failed to create new subscription on Stripe: {create_response.text}")
+
+            new_stripe_subscription = create_response.json()
+            new_stripe_sub_id = new_stripe_subscription["id"]
+
+            new_subscription = Subscription(
+                org_id=current_subscription.org_id,
+                package_id=new_package_id,
+                stripe_sub_id=new_stripe_sub_id,  
+                status=Status.PENDING,  
+                active_date=current_subscription.expired_date + timedelta(days=1),
+                expired_date=current_subscription.expired_date + relativedelta(months=1),
+            )
+
+            session.add(new_subscription)
+            session.commit()
+            session.refresh(new_subscription)
+
+            return SubscriptionPublic.model_validate(new_subscription)
+
 
 
     def get_current_active_subscription(

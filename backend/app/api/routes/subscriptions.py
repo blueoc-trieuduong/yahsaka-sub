@@ -1,9 +1,9 @@
 from datetime import datetime
 import requests
 from fastapi import APIRouter, HTTPException, Request
-from sqlmodel import select
+from sqlmodel import desc, select
 from fastapi import Request
-
+from dateutil.relativedelta import relativedelta
 from app.core.config import settings
 from app.api.deps import CurrentUser, SessionDep
 from app.models.models import Subscription
@@ -14,6 +14,7 @@ from app.models.subscriptions import (
     SubscriptionUpgrade,
     SubscriptionsPublic,
 )
+from datetime import datetime, timedelta
 from app.services.subscriptions import (
     SubscriptionServices,
 )
@@ -131,14 +132,14 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     subscription_db.updated_at = datetime.now()
                     session.add(subscription_db)
                     session.commit()
-                
-                new_subscription = SubscriptionServices.create_subscription_from_stripe(
-                    session=session,
-                    stripe_sub_id=subscription_id,
-                    org_id=org_id,
-                    package_id=package_id,
-                )
-                
+                else:
+                    new_subscription = SubscriptionServices.create_subscription_from_stripe(
+                        session=session,
+                        stripe_sub_id=subscription_id,
+                        org_id=org_id,
+                        package_id=package_id,
+                    )
+                    
                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
             else:
                 if not subscription_id:
@@ -196,23 +197,80 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             }
         
         elif event.get("type") == "invoice.payment_succeeded":
+            print("🔔 Stripe vừa tự động trừ tiền! Kiểm tra subscription...")
+
             subscription_id = event["data"]["object"]["subscription"]
             if not subscription_id:
                 return {"status": "no subscription found in invoice"}
+            
+            pending_subscription = session.exec(
+                select(Subscription).where(
+                    Subscription.stripe_sub_id == subscription_id,
+                    Subscription.status == Status.PENDING
+                )
+            ).first()
+
+            if pending_subscription:
+                print("✅ Found pending subscription, activating it.")
+                pending_subscription.status = Status.ACTIVE
+                pending_subscription.updated_at = datetime.utcnow()
+                session.commit()
+
+                active_subscription = session.exec(
+                    select(Subscription).where(
+                        Subscription.stripe_sub_id == subscription_id,
+                        Subscription.status == Status.ACTIVE
+                    )
+                ).first()
                 
+                if active_subscription:
+                    active_subscription.status = Status.DONE
+                    session.commit()
+
+                return {
+                    "status": "pending subscription activated",
+                    "subscription_id": pending_subscription.id
+                }
+
             statement = select(Subscription).where(
                 Subscription.stripe_sub_id == subscription_id
-            )
-            result = session.exec(statement)
-            subscription = result.first()
+            ).order_by(desc(Subscription.created_at))
             
-            if subscription:
-                subscription.status = Status.ACTIVE.value
-                subscription.updated_at = datetime.now()
-                session.commit()
-                
-            return {"status": "payment succeeded", "subscription_id": subscription.id if subscription else None}
-        
+            subscriptions = session.exec(statement).all()
+            if not subscriptions:
+                return {"status": "subscription not found in database"}
+
+            for sub in subscriptions:
+                sub.status = Status.DONE
+                session.add(sub)
+
+            session.commit()
+
+            latest_subscription = subscriptions[0]  
+            package_id = latest_subscription.package_id
+            org_id = latest_subscription.org_id
+            
+            new_active_date = latest_subscription.expired_date + timedelta(days=1)
+            new_expired_date = new_active_date + relativedelta(months=1)
+
+            new_subscription = Subscription(
+                org_id=org_id,
+                package_id=package_id,
+                stripe_sub_id=subscription_id,
+                status=Status.ACTIVE,
+                active_date=new_active_date,
+                expired_date=new_expired_date,
+            )
+
+            session.add(new_subscription)
+            session.commit()
+            session.refresh(new_subscription)
+
+            return {
+                "status": "new subscription created after payment",
+                "subscription_id": new_subscription.id,
+            }
+
         return {"status": "unhandled event"}
         
     except Exception as e:
