@@ -203,10 +203,9 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
 
                 # Đánh dấu subscription ACTIVE cũ thành DONE
                 latest_subscription = session.exec(
-                    select(Subscription).where(
-                        Subscription.stripe_sub_id == subscription_id,
-                        Subscription.status == Status.ACTIVE
-                    )
+                    select(Subscription)
+                    .where(Subscription.stripe_sub_id == subscription_id)
+                    .order_by(desc(Subscription.created_at))  # 🔹 Đặt `.order_by()` TRƯỚC `.first()`
                 ).first()
 
                 if latest_subscription:
@@ -217,10 +216,12 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 session.commit()
                 return {"status": "pending subscription activated", "subscription_id": pending_subscription.id}
 
-            # 🔹 Nếu không có PENDING, tạo mới subscription
+            # 🔹 Nếu không có PENDING, tạo subscription mới
             latest_subscription = session.exec(
-                select(Subscription).where(Subscription.stripe_sub_id == subscription_id)
-            ).order_by(desc(Subscription.created_at)).first()
+                select(Subscription)
+                .where(Subscription.stripe_sub_id == subscription_id)
+                .order_by(desc(Subscription.created_at))  # 🔹 Đặt `.order_by()` TRƯỚC `.first()`
+            ).first()
 
             if latest_subscription:
                 print("✅ Đánh dấu subscription cũ thành DONE.")
@@ -245,6 +246,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             session.refresh(new_subscription)
 
             return {"status": "new subscription created after payment", "subscription_id": new_subscription.id}
+
 
 
 

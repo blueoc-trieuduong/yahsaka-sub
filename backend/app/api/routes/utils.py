@@ -1,3 +1,4 @@
+from datetime import datetime
 from app.models.subscriptions import Status
 from fastapi import APIRouter, Depends
 from pydantic.networks import EmailStr
@@ -29,5 +30,5 @@ def test_email(email_to: EmailStr) -> Message:
 
 @router.get("/health-check/")
 async def health_check() -> bool:
-    print(Status.UPGRADED.value)
+    print(datetime.utcnow())
     return True
