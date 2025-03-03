@@ -97,6 +97,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     "Content-Type": "application/x-www-form-urlencoded",
                 }
 
+                # 🔹 Lấy subscription hiện tại từ Stripe
                 subscription_response = requests.get(
                     f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
                     headers=headers
@@ -108,6 +109,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 stripe_subscription = subscription_response.json()
                 subscription_item_id = stripe_subscription["items"]["data"][0]["id"]
 
+                # 🔹 Cập nhật subscription trên Stripe với gói mới
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": new_price_id,
@@ -124,14 +126,15 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 if update_response.status_code != 200:
                     raise Exception(f"Failed to update subscription: {update_response.text}")
 
+                # 🔹 Lấy subscription `ACTIVE` gần nhất để upgrade
                 existing_subscription = session.exec(
                     select(Subscription)
                     .where(Subscription.stripe_sub_id == subscription_id, Subscription.status == Status.ACTIVE)
-                    .order_by(desc(Subscription.expired_date)) 
+                    .order_by(desc(Subscription.expired_date))  # 🔥 Sắp xếp theo `expired_date` mới nhất
                 ).first()
 
                 if existing_subscription:
-                    print("✅ Subscription hiện tại được nâng cấp, đánh dấu là UPGRADED.")
+                    print("✅ Subscription gần nhất được nâng cấp, đánh dấu là UPGRADED.")
                     existing_subscription.status = Status.UPGRADED
                     existing_subscription.updated_at = datetime.utcnow()
                     session.commit()
@@ -156,6 +159,28 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
 
                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
 
+
+            else:
+                if not subscription_id:
+                    return {"status": "no subscription found in session"}
+
+                existing_subscription = session.exec(
+                    select(Subscription).where(Subscription.stripe_sub_id == subscription_id)
+                ).first()
+
+                if existing_subscription:
+                    print("✅ Subscription đã tồn tại, không tạo mới.")
+                    return {"status": "subscription already exists", "subscription_id": subscription_id}
+
+                print("🔔 Tạo subscription mới từ checkout session.")
+                new_subscription = SubscriptionServices.create_subscription_from_stripe(
+                    session=session,
+                    stripe_sub_id=subscription_id,
+                    org_id=org_id,
+                    package_id=package_id,
+                )
+
+                return {"status": "subscription created", "subscription_id": subscription_id}
 
         elif event.get("type") == "invoice.payment_succeeded":
             print("🔔 Stripe vừa tự động trừ tiền! Kiểm tra subscription...")
@@ -246,203 +271,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
         raise HTTPException(status_code=400, detail=f"Webhook handling failed: {e}")
 
 
-# @router.post("/webhook")
-# async def handle_stripe_webhook(request: Request, session: SessionDep):
-#     try:
-#         print("Webhook accessed")
-#         event = await request.json()
-#         print("Received event:", event)
-        
-#         if event.get("type") == "checkout.session.completed":
-#             session_data = event["data"]["object"]
-#             metadata = session_data.get("metadata", {})
-#             subscription_id = session_data.get("subscription")
-#             org_id = metadata.get("org_id")
-#             package_id = metadata.get("package_id")
-            
-#             if metadata.get("subscription_id") and metadata.get("new_price_id"):
-#                 subscription_id = metadata["subscription_id"]
-#                 new_price_id = metadata["new_price_id"]
-                
-#                 headers = {
-#                     "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
-#                     "Content-Type": "application/x-www-form-urlencoded",
-#                 }
-                
-#                 subscription_response = requests.get(
-#                     f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
-#                     headers=headers
-#                 )
-                
-#                 if subscription_response.status_code != 200:
-#                     raise Exception(f"Failed to get subscription: {subscription_response.text}")
-                    
-#                 subscription = subscription_response.json()
-#                 subscription_item_id = subscription["items"]["data"][0]["id"]
-                
-#                 update_params = {
-#                     "items[0][id]": subscription_item_id,
-#                     "items[0][price]": new_price_id,
-#                     "proration_behavior": "none",
-#                     "billing_cycle_anchor": "unchanged"
-#                 }
-                
-#                 update_response = requests.post(
-#                     f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
-#                     headers=headers,
-#                     data=update_params
-#                 )
-                
-#                 if update_response.status_code != 200:
-#                     raise Exception(f"Failed to update subscription: {update_response.text}")
-                
-#                 subscription_db = session.exec(
-#                     select(Subscription).where(
-#                         Subscription.stripe_sub_id == subscription_id
-#                     )
-#                 ).first()
-#                 if subscription_db:
-#                     subscription_db.status = Status.UPGRADED.value
-#                     subscription_db.updated_at = datetime.now()
-#                     session.add(subscription_db)
-#                     session.commit()
-                    
-#                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
-#             else:
-#                 if not subscription_id:
-#                     return {"status": "no subscription found in session"}
-                    
-#                 new_subscription = SubscriptionServices.create_subscription_from_stripe(
-#                     session=session,
-#                     stripe_sub_id=subscription_id,
-#                     org_id=org_id,
-#                     package_id=package_id,
-#                 )
-#                 return {"status": "success", "subscription_id": new_subscription.id}
-        
-#         elif event.get("type") == "customer.subscription.updated":
-#             subscription_id = event["data"]["object"]["id"]
-#             status = event["data"]["object"]["status"]
-#             subscription = session.exec(
-#                 select(Subscription).where(
-#                     Subscription.stripe_sub_id == subscription_id
-#                 )
-#             ).first()
-#             if subscription:
-#                 if subscription.status != Status.UPGRADED.value:
-#                     if status == "active":
-#                         subscription.status = Status.ACTIVE.value
-#                     elif status == "canceled":
-#                         subscription.status = Status.CANCELED.value
-#                     else:
-#                         subscription.status = Status.PENDING.value
-#                     subscription.updated_at = datetime.now()
-#                     session.commit()
 
-#             return {
-#                 "status": "subscription updated",
-#                 "subscription_id": subscription.id if subscription else None,
-#             }
-
-        
-#         elif event.get("type") == "customer.subscription.deleted":
-#             subscription_id = event["data"]["object"]["id"]
-#             subscription = session.exec(
-#                 select(Subscription).where(
-#                     Subscription.stripe_sub_id == subscription_id
-#                 )
-#             ).first()
-            
-#             if subscription:
-#                 subscription.status = Status.CANCELED.value
-#                 subscription.unsubscribe_at = datetime.now()
-#                 session.commit()
-                
-#             return {
-#                 "status": "subscription canceled",
-#                 "subscription_id": subscription.id if subscription else None,
-#             }
-        
-#         elif event.get("type") == "invoice.payment_succeeded":
-#             print("🔔 Stripe vừa tự động trừ tiền! Kiểm tra subscription...")
-
-#             subscription_id = event["data"]["object"]["subscription"]
-#             if not subscription_id:
-#                 return {"status": "no subscription found in invoice"}
-            
-#             pending_subscription = session.exec(
-#                 select(Subscription).where(
-#                     Subscription.stripe_sub_id == subscription_id,
-#                     Subscription.status == Status.PENDING
-#                 )
-#             ).first()
-
-#             if pending_subscription:
-#                 print("✅ Found pending subscription, activating it.")
-#                 pending_subscription.status = Status.ACTIVE
-#                 pending_subscription.updated_at = datetime.utcnow()
-#                 session.commit()
-
-#                 active_subscription = session.exec(
-#                     select(Subscription).where(
-#                         Subscription.stripe_sub_id == subscription_id,
-#                         Subscription.status == Status.ACTIVE
-#                     )
-#                 ).first()
-                
-#                 if active_subscription:
-#                     active_subscription.status = Status.DONE
-#                     session.commit()
-
-#                 return {
-#                     "status": "pending subscription activated",
-#                     "subscription_id": pending_subscription.id
-#                 }
-
-#             statement = select(Subscription).where(
-#                 Subscription.stripe_sub_id == subscription_id
-#             ).order_by(desc(Subscription.created_at))
-            
-#             subscriptions = session.exec(statement).all()
-#             if not subscriptions:
-#                 return {"status": "subscription not found in database"}
-
-#             for sub in subscriptions:
-#                 sub.status = Status.DONE
-#                 session.add(sub)
-
-#             session.commit()
-
-#             latest_subscription = subscriptions[0]  
-#             package_id = latest_subscription.package_id
-#             org_id = latest_subscription.org_id
-            
-#             new_active_date = latest_subscription.expired_date + timedelta(days=1)
-#             new_expired_date = new_active_date + relativedelta(months=1)
-
-#             new_subscription = Subscription(
-#                 org_id=org_id,
-#                 package_id=package_id,
-#                 stripe_sub_id=subscription_id,
-#                 status=Status.ACTIVE,
-#                 active_date=new_active_date,
-#                 expired_date=new_expired_date,
-#             )
-
-#             session.add(new_subscription)
-#             session.commit()
-#             session.refresh(new_subscription)
-
-#             return {
-#                 "status": "new subscription created after payment",
-#                 "subscription_id": new_subscription.id,
-#             }
-
-#         return {"status": "unhandled event"}
-        
-#     except Exception as e:
-#         print(f"Error handling webhook: {e}")
-#         raise HTTPException(status_code=400, detail=f"Webhook handling failed: {e}")
 
 
 @router.post("/upgrade-plan")
