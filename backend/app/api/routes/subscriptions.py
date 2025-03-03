@@ -132,13 +132,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     subscription_db.updated_at = datetime.now()
                     session.add(subscription_db)
                     session.commit()
-                else:
-                    new_subscription = SubscriptionServices.create_subscription_from_stripe(
-                        session=session,
-                        stripe_sub_id=subscription_id,
-                        org_id=org_id,
-                        package_id=package_id,
-                    )
                     
                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
             else:
