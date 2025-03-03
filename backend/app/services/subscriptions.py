@@ -154,8 +154,8 @@ class SubscriptionServices:
         update_params = {
             "items[0][id]": subscription_item_id,
             "items[0][price]": new_package.stripe_price_id,
-            "proration_behavior": "none",  # Không tính tiền ngay
-            "billing_cycle_anchor": "unchanged"  # 🔥 Dùng được vì đang UPDATE subscription
+            "proration_behavior": "none", 
+            "billing_cycle_anchor": "unchanged" 
         }
 
         update_response = requests.post(
@@ -169,7 +169,6 @@ class SubscriptionServices:
         if update_response.status_code != 200:
             raise Exception(f"Failed to update subscription on Stripe: {update_response.text}")
 
-        # 🔹 Chỉ tạo mới trong DB, giữ nguyên Stripe Subscription
         new_subscription = Subscription(
             org_id=current_subscription.org_id,
             package_id=new_package_id,
