@@ -154,12 +154,14 @@ class SubscriptionServices:
                 "billing_cycle_anchor": "unchanged",  
                 "proration_behavior": "none",  
             }
+            print('create_params', create_params)
 
             create_response = requests.post(
                 f"https://api.stripe.com/v1/subscriptions",
                 headers=headers,
                 data=create_params,
             )
+            print('res downgradee', create_response.json())
 
             if create_response.status_code != 200:
                 raise Exception(f"Failed to create new subscription on Stripe: {create_response.text}")
