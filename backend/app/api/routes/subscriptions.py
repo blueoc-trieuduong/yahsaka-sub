@@ -81,6 +81,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
         event = await request.json()
         print("Received event:", event)
 
+        # 🎯 Xử lý khi khách hàng thanh toán thành công tại checkout
         if event.get("type") == "checkout.session.completed":
             session_data = event["data"]["object"]
             metadata = session_data.get("metadata", {})
@@ -88,6 +89,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             org_id = metadata.get("org_id")
             package_id = metadata.get("package_id")
 
+            # 🔹 Xử lý Upgrade Subscription
             if metadata.get("subscription_id") and metadata.get("new_price_id"):
                 subscription_id = metadata["subscription_id"]
                 new_price_id = metadata["new_price_id"]
@@ -97,6 +99,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     "Content-Type": "application/x-www-form-urlencoded",
                 }
 
+                # Lấy subscription từ Stripe
                 subscription_response = requests.get(
                     f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
                     headers=headers
@@ -108,6 +111,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 stripe_subscription = subscription_response.json()
                 subscription_item_id = stripe_subscription["items"]["data"][0]["id"]
 
+                # Cập nhật gói trong Stripe
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": new_price_id,
@@ -124,6 +128,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 if update_response.status_code != 200:
                     raise Exception(f"Failed to update subscription: {update_response.text}")
 
+                # Cập nhật trạng thái subscription cũ thành UPGRADED
                 existing_subscription = session.exec(
                     select(Subscription).where(Subscription.stripe_sub_id == subscription_id)
                 ).first()
@@ -134,6 +139,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     existing_subscription.updated_at = datetime.utcnow()
                     session.commit()
 
+                # Tạo subscription mới với gói upgrade
                 print("🔔 Tạo subscription mới sau khi upgrade.")
                 new_subscription = SubscriptionServices.create_subscription_from_stripe(
                     session=session,
@@ -144,6 +150,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
 
                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
 
+            # 🔹 Xử lý tạo subscription mới nếu không phải upgrade
             else:
                 if not subscription_id:
                     return {"status": "no subscription found in session"}
@@ -153,6 +160,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 ).first()
 
                 if existing_subscription:
+                    print("✅ Subscription đã tồn tại, không tạo mới.")
                     return {"status": "subscription already exists", "subscription_id": subscription_id}
 
                 print("🔔 Tạo subscription mới từ checkout session.")
@@ -165,6 +173,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
 
                 return {"status": "subscription created", "subscription_id": subscription_id}
 
+        # 🎯 Xử lý khi Stripe tự động trừ tiền hàng tháng
         elif event.get("type") == "invoice.payment_succeeded":
             print("🔔 Stripe vừa tự động trừ tiền! Kiểm tra subscription...")
 
@@ -172,6 +181,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             if not subscription_id:
                 return {"status": "no subscription found in invoice"}
 
+            # 🔹 Nếu có subscription PENDING, kích hoạt thay vì tạo mới
             pending_subscription = session.exec(
                 select(Subscription).where(
                     Subscription.stripe_sub_id == subscription_id,
