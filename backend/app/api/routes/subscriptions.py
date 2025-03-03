@@ -125,46 +125,37 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     raise Exception(f"Failed to update subscription: {update_response.text}")
 
                 existing_subscription = session.exec(
-                    select(Subscription).where(Subscription.stripe_sub_id == subscription_id)
+                    select(Subscription)
+                    .where(Subscription.stripe_sub_id == subscription_id, Subscription.status == Status.ACTIVE)
+                    .order_by(desc(Subscription.expired_date)) 
                 ).first()
 
                 if existing_subscription:
-                    print("✅ Subscription được nâng cấp, đánh dấu là UPGRADED.")
+                    print("✅ Subscription hiện tại được nâng cấp, đánh dấu là UPGRADED.")
                     existing_subscription.status = Status.UPGRADED
                     existing_subscription.updated_at = datetime.utcnow()
                     session.commit()
 
+                # 🔹 Tạo subscription mới với gói upgrade
                 print("🔔 Tạo subscription mới sau khi upgrade.")
-                new_subscription = SubscriptionServices.create_subscription_from_stripe(
-                    session=session,
+                new_active_date = existing_subscription.expired_date + timedelta(days=1)
+                new_expired_date = new_active_date + relativedelta(months=1)
+
+                new_subscription = Subscription(
+                    org_id=existing_subscription.org_id,
+                    package_id=package_id,  # Gói mới
                     stripe_sub_id=subscription_id,
-                    org_id=org_id,
-                    package_id=package_id,
+                    status=Status.ACTIVE,
+                    active_date=new_active_date,
+                    expired_date=new_expired_date,
                 )
+
+                session.add(new_subscription)
+                session.commit()
+                session.refresh(new_subscription)
 
                 return {"status": "subscription upgraded", "subscription_id": subscription_id}
 
-            else:
-                if not subscription_id:
-                    return {"status": "no subscription found in session"}
-
-                existing_subscription = session.exec(
-                    select(Subscription).where(Subscription.stripe_sub_id == subscription_id)
-                ).first()
-
-                if existing_subscription:
-                    print("✅ Subscription đã tồn tại, không tạo mới.")
-                    return {"status": "subscription already exists", "subscription_id": subscription_id}
-
-                print("🔔 Tạo subscription mới từ checkout session.")
-                new_subscription = SubscriptionServices.create_subscription_from_stripe(
-                    session=session,
-                    stripe_sub_id=subscription_id,
-                    org_id=org_id,
-                    package_id=package_id,
-                )
-
-                return {"status": "subscription created", "subscription_id": subscription_id}
 
         elif event.get("type") == "invoice.payment_succeeded":
             print("🔔 Stripe vừa tự động trừ tiền! Kiểm tra subscription...")
@@ -201,7 +192,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 pending_subscription.status = Status.ACTIVE
                 pending_subscription.updated_at = now
 
-                # 🔹 Chuyển subscription `ACTIVE` cũ thành `DONE`
                 active_subscription_old = session.exec(
                     select(Subscription).where(
                         Subscription.stripe_sub_id == subscription_id,
