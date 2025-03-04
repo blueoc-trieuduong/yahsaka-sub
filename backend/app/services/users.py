@@ -98,14 +98,6 @@ class UserServices:
         UserServices.check_existing_entity(
             session=session,
             model=Org,
-            attribute="slug",
-            value=user_register.org.slug,
-            detail_message="Org with this slug already exists",
-        )
-
-        UserServices.check_existing_entity(
-            session=session,
-            model=Org,
             attribute="company_prefix",
             value=user_register.org.company_prefix,
             detail_message="Org with this prefix already exists",

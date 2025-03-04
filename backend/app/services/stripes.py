@@ -13,7 +13,6 @@ class StripeId(SQLModel):
 class StripeServices:
     def create_stripe_checkout(data):
         try:
-            print("dataSession", data)
             payload = {
                 "mode": "subscription",
                 "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
@@ -23,8 +22,6 @@ class StripeServices:
                 "metadata[org_id]": data["org_id"],
                 "metadata[package_id]": data["package_id"],
             }
-
-            print("Payload gửi đến Stripe:", payload)
 
             headers = {
                 "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
@@ -36,7 +33,6 @@ class StripeServices:
                 headers=headers,
                 data=payload,
             )
-            print("res", response.json())
 
             if response.status_code == 200:
                 return response.json()
@@ -114,7 +110,6 @@ class StripeServices:
     def update_subscription(item, stripe_product_id, stripe_price_id):
         item["stripeProductId"] = stripe_product_id.id
         item["stripePriceId"] = stripe_price_id.id
-        print("Subscription updated:", item)
         return item
 
     def create_proration_checkout(data):
@@ -133,7 +128,6 @@ class StripeServices:
                 raise HTTPException(
                     status_code=400, detail="Could not retrieve subscription"
                 )
-            print("res sucess")
             subscription = response.json()
             subscription_item_id = subscription["items"]["data"][0]["id"]
             customer_id = subscription["customer"]
@@ -150,8 +144,6 @@ class StripeServices:
             )
 
             if preview_response.status_code != 200:
-                print("loi o day ne")
-                print(preview_response.status_code)
                 raise HTTPException(
                     status_code=400, detail="Failed to preview prorated charges"
                 )
@@ -163,16 +155,11 @@ class StripeServices:
                 if item.get("proration", False)
             )
 
-            print("previewData", preview_data)
-            print("prorated_amount", prorated_amount)
-
             success_url = (
                 "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page"
             )
             cancel_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet?upgrade_cancelled=true"
-            print("preIf")
             if prorated_amount > 0:
-                print("inIf")
                 checkout_params = {
                     "mode": "payment",
                     "success_url": success_url,
@@ -187,26 +174,19 @@ class StripeServices:
                     "metadata[package_id]": data["package_id"],
                     "metadata[new_price_id]": data["price_id"],
                 }
-                print("outif")
                 checkout_response = requests.post(
                     "https://api.stripe.com/v1/checkout/sessions",
                     headers=headers,
                     data=checkout_params,
                 )
-                print("response", checkout_response)
-                print("response", checkout_response.status_code)
 
                 if checkout_response.status_code != 200:
-                    print("asdfadsfasssss")
                     raise HTTPException(
                         status_code=400, detail="Failed to create checkout session"
                     )
-                print("response", checkout_response.json())
-                print("url", checkout_response.json()["url"])
                 return checkout_response.json()["url"]
 
             else:
-                print("else")
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": data["price_id"],

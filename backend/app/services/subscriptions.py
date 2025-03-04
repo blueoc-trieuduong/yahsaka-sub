@@ -25,7 +25,6 @@ class SubscriptionServices:
         *, session: SessionDep, package_id: UUID, org_id: UUID
     ):
         try:
-            print("package_id", package_id)
             package = session.get(Package, package_id)
             if not package:
                 raise HTTPException(status_code=404, detail="Package not found")
@@ -35,7 +34,6 @@ class SubscriptionServices:
                 raise HTTPException(
                     status_code=400, detail="No price ID associated with this package"
                 )
-            print("price_id", price_id)
             stripe_session = StripeServices.create_stripe_checkout(
                 {"priceId": price_id, "org_id": org_id, "package_id": package_id}
             )
@@ -57,8 +55,6 @@ class SubscriptionServices:
         session: Session, stripe_sub_id: str, org_id: str, package_id: str
     ) -> SubscriptionCreate:
         try:
-            print("createSub access")
-
             new_subscription = Subscription(
                 stripe_sub_id=stripe_sub_id,
                 org_id=org_id,
@@ -305,7 +301,6 @@ class SubscriptionServices:
             )
 
     def create_subscription_upgrade(session, package_id, org_id, subscription_id):
-        print("accessService")
         package = session.get(Package, package_id)
         if not package:
             raise HTTPException(status_code=404, detail="Package not found")
