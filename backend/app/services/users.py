@@ -19,6 +19,7 @@ class UserServices:
             print("user_register", user_register)
 
             org_obj = Org.model_validate(user_register.org)
+            print("org", org_obj)
             session.add(org_obj)
             session.commit()
             session.refresh(org_obj)
