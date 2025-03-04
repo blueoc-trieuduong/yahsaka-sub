@@ -27,11 +27,6 @@ class OrgCreate(SQLModel):
     country: str = Field(max_length=255)
     address: str | None = Field(default=None, max_length=255, nullable=True)
     tax_code: str | None = Field(default=None, max_length=255, nullable=True)
-    admin_first_name: str = Field(max_length=255)
-    admin_last_name: str = Field(max_length=255)
-    admin_email: str = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=40)
-    password_confirmation: str = Field(min_length=8, max_length=40)
 
 
 class OrgUpdate(SQLModel):
