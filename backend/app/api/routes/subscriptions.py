@@ -164,11 +164,16 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
 
                 new_subscription = Subscription(
                     org_id=existing_subscription.org_id,
-                    package_id=package_id,  # Gói mới
+                    package_id=package_id,
                     stripe_sub_id=subscription_id,
                     status=Status.ACTIVE,
                     active_date=new_active_date,
                     expired_date=new_expired_date,
+                )
+                TimesheetServices.update_timesheet_org(
+                    session=session,
+                    org_id=existing_subscription.org_id,
+                    package_id=package_id,
                 )
 
                 session.add(new_subscription)
@@ -298,11 +303,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 status=Status.ACTIVE,
                 active_date=new_active_date,
                 expired_date=new_expired_date,
-            )
-            TimesheetServices.update_timesheet_org(
-                session=session,
-                org_id=new_subscription.org_id,
-                package_id=new_subscription.package_id,
             )
 
             session.add(new_subscription)

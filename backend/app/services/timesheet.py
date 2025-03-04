@@ -56,6 +56,7 @@ class TimesheetServices:
         return update_response
 
     def update_timesheet_org(session: Session, org_id: int, package_id: uuid.UUID):
+        print("updatetimesheet")
         package = session.get(Package, package_id)
         org_obj = session.get(Org, org_id)
 
