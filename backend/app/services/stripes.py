@@ -13,15 +13,18 @@ class StripeId(SQLModel):
 class StripeServices:
     def create_stripe_checkout(data):
         try:
+            print("dataSession", data)
             payload = {
                 "mode": "subscription",
-                "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/checkout",
+                "success_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page",
                 "cancel_url": "https://truongnguyen94.wixsite.com/yashaka-timesheet",
                 "line_items[0][price]": data["priceId"],
                 "line_items[0][quantity]": "1",
-                "metadata[user_id]": data["user_id"],
+                "metadata[org_id]": data["org_id"],
                 "metadata[package_id]": data["package_id"],
             }
+
+            print("Payload gửi đến Stripe:", payload)
 
             headers = {
                 "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
@@ -33,6 +36,7 @@ class StripeServices:
                 headers=headers,
                 data=payload,
             )
+            print("res", response.json())
 
             if response.status_code == 200:
                 return response.json()
@@ -112,3 +116,120 @@ class StripeServices:
         item["stripePriceId"] = stripe_price_id.id
         print("Subscription updated:", item)
         return item
+
+    def create_proration_checkout(data):
+        try:
+            headers = {
+                "Authorization": f"Bearer {settings.STRIPE_SECRET_KEY}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+
+            response = requests.get(
+                f"https://api.stripe.com/v1/subscriptions/{data['subscription_id']}",
+                headers=headers,
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=400, detail="Could not retrieve subscription"
+                )
+            print("res sucess")
+            subscription = response.json()
+            subscription_item_id = subscription["items"]["data"][0]["id"]
+            customer_id = subscription["customer"]
+            preview_params = {
+                "customer": customer_id,
+                "subscription": data["subscription_id"],
+                "subscription_items[0][id]": subscription_item_id,
+                "subscription_items[0][price]": data["price_id"],
+            }
+            preview_response = requests.get(
+                "https://api.stripe.com/v1/invoices/upcoming",
+                headers=headers,
+                params=preview_params,
+            )
+
+            if preview_response.status_code != 200:
+                print("loi o day ne")
+                print(preview_response.status_code)
+                raise HTTPException(
+                    status_code=400, detail="Failed to preview prorated charges"
+                )
+
+            preview_data = preview_response.json()
+            prorated_amount = sum(
+                item["amount"]
+                for item in preview_data["lines"]["data"]
+                if item.get("proration", False)
+            )
+
+            print("previewData", preview_data)
+            print("prorated_amount", prorated_amount)
+
+            success_url = (
+                "https://truongnguyen94.wixsite.com/yashaka-timesheet/thankyou-page"
+            )
+            cancel_url = "https://truongnguyen94.wixsite.com/yashaka-timesheet?upgrade_cancelled=true"
+            print("preIf")
+            if prorated_amount > 0:
+                print("inIf")
+                checkout_params = {
+                    "mode": "payment",
+                    "success_url": success_url,
+                    "cancel_url": cancel_url,
+                    "line_items[0][price_data][currency]": "usd",
+                    "line_items[0][price_data][product_data][name]": "Plan Upgrade - Prorated Amount",
+                    "line_items[0][price_data][unit_amount]": prorated_amount,
+                    "line_items[0][quantity]": 1,
+                    "customer": customer_id,
+                    "metadata[subscription_id]": data["subscription_id"],
+                    "metadata[org_id]": data["org_id"],
+                    "metadata[package_id]": data["package_id"],
+                    "metadata[new_price_id]": data["price_id"],
+                }
+                print("outif")
+                checkout_response = requests.post(
+                    "https://api.stripe.com/v1/checkout/sessions",
+                    headers=headers,
+                    data=checkout_params,
+                )
+                print("response", checkout_response)
+                print("response", checkout_response.status_code)
+
+                if checkout_response.status_code != 200:
+                    print("asdfadsfasssss")
+                    raise HTTPException(
+                        status_code=400, detail="Failed to create checkout session"
+                    )
+                print("response", checkout_response.json())
+                print("url", checkout_response.json()["url"])
+                return checkout_response.json()["url"]
+
+            else:
+                print("else")
+                update_params = {
+                    "items[0][id]": subscription_item_id,
+                    "items[0][price]": data["price_id"],
+                    "metadata[org_id]": data["org_id"],
+                    "metadata[package_id]": data["package_id"],
+                    "proration_behavior": "none",
+                }
+
+                update_response = requests.post(
+                    f"https://api.stripe.com/v1/subscriptions/{data['subscription_id']}",
+                    headers=headers,
+                    data=update_params,
+                )
+
+                if update_response.status_code != 200:
+                    raise HTTPException(
+                        status_code=400, detail="Failed to update subscription"
+                    )
+
+                return success_url
+
+        except Exception as error:
+            print(f"Error in subscription upgrade process: {error}")
+            raise HTTPException(
+                status_code=400, detail=f"Subscription upgrade failed: {error}"
+            )

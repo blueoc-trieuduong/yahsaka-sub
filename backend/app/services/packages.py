@@ -13,7 +13,11 @@ from app.services.stripes import StripeServices
 class PackageServices:
     def get_packages_by_app_id(*, session: SessionDep, app_id: UUID) -> PackagesPublic:
         try:
-            statement = select(Package).where(Package.app_id == app_id)
+            statement = (
+                select(Package)
+                .where(Package.app_id == app_id)
+                .order_by(Package.created_at)
+            )
             count_statement = select(func.count()).select_from(statement)
 
             count = session.exec(count_statement).one()
