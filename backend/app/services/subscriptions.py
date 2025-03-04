@@ -130,14 +130,12 @@ class SubscriptionServices:
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # 🔹 Lấy thông tin package mới từ DB
         statement = select(Package).where(Package.id == new_package_id)
         new_package = session.exec(statement).first()
         if not new_package:
             raise HTTPException(status_code=404, detail="Package not found")
 
         stripe_sub_id = current_subscription.stripe_sub_id
-        print("stripe_sub_id", stripe_sub_id)
 
         stripe_subscription_response = requests.get(
             f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
@@ -165,8 +163,6 @@ class SubscriptionServices:
             data=update_params,
         )
 
-        print("res downgrade", update_response.json())
-
         if update_response.status_code != 200:
             raise Exception(
                 f"Failed to update subscription on Stripe: {update_response.text}"
@@ -175,7 +171,7 @@ class SubscriptionServices:
         new_subscription = Subscription(
             org_id=current_subscription.org_id,
             package_id=new_package_id,
-            stripe_sub_id=stripe_sub_id,  # Vẫn dùng ID cũ
+            stripe_sub_id=stripe_sub_id,
             status=Status.PENDING,
             active_date=current_subscription.expired_date + timedelta(days=1),
             expired_date=current_subscription.expired_date + relativedelta(months=1),
@@ -191,7 +187,7 @@ class SubscriptionServices:
         *, session: Session, org_id: UUID, isActive: bool
     ) -> SubscriptionPublic:
         try:
-            now = datetime.utcnow()
+            now = datetime.now()
 
             if isActive:
                 status_filter = [Status.ACTIVE, Status.CANCELED]
@@ -320,7 +316,6 @@ class SubscriptionServices:
             "package_id": package_id,
             "subscription_id": subscription_id,
         }
-        print("checkoutdata", checkout_data)
 
         checkout_session = StripeServices.create_proration_checkout(checkout_data)
         return checkout_session

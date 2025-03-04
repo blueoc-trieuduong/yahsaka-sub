@@ -18,7 +18,6 @@ class OrgBase(SQLModel):
 
 
 class OrgCreate(SQLModel):
-    id: int
     name: str = Field(max_length=255)
     phone_number: str = Field(max_length=255)
     email: str = Field(max_length=255)
