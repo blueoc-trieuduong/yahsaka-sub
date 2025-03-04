@@ -9,7 +9,6 @@ class OrgBase(SQLModel):
     email: str = Field(max_length=255)
     max_empoyees: int = Field(gt=0)
     industry: str = Field(max_length=255)
-    slug: str = Field(unique=True, max_length=255)
     company_prefix: str = Field(unique=True, max_length=25)
     country: str = Field(max_length=255)
     address: str | None = Field(default=None, max_length=255, nullable=True)
@@ -19,14 +18,12 @@ class OrgBase(SQLModel):
 
 
 class OrgCreate(SQLModel):
+    id: int
     admin_first_name: str = Field(max_length=255)
     admin_last_name: str = Field(max_length=255)
     admin_email: str = Field(max_length=255)
     password: str = Field(min_length=8, max_length=40)
-    name: str = Field(max_length=255)
-    slug: str = Field(max_length=255)
-    company_prefix: str = Field(max_length=255)
-    country: str = Field(max_length=255)
+    password_confirmation: str = Field(min_length=8, max_length=40)
 
 
 class OrgUpdate(SQLModel):
