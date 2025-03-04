@@ -23,7 +23,7 @@ class TimesheetServices:
         print("max_employees", max_employees)
 
         org_params = {
-            "organization_id": org_obj.id,
+            "organization_id": str(org_obj.id),
             "organization_name": org_obj.name,
             "phone_number": org_obj.phone_number,
             "email": org_obj.email,
@@ -67,7 +67,6 @@ class TimesheetServices:
         max_employees = package.max_employees if package else 0
 
         update_params = {
-            "organization_id": str(org_obj.id),
             "organization_name": org_obj.name,
             "phone_number": org_obj.phone_number,
             "email": org_obj.email,
