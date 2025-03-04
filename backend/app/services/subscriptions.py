@@ -183,7 +183,7 @@ class SubscriptionServices:
         *, session: Session, org_id: UUID, isActive: bool
     ) -> SubscriptionPublic:
         try:
-            now = datetime.now()
+            now = datetime.utcnow()
 
             if isActive:
                 status_filter = [Status.ACTIVE, Status.CANCELED]
