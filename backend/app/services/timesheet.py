@@ -43,13 +43,13 @@ class TimesheetServices:
 
         headers = {
             "Authorization": f"Bearer {settings.API_TOKEN}",
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
         }
 
         update_response = requests.post(
             f"{settings.TIMESHEET_API_URL}/organization/create",
             headers=headers,
-            data=org_params,
+            json=org_params,
         )
         print("update_response", update_response)
 
