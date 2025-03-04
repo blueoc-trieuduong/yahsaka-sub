@@ -144,10 +144,10 @@ def verify_password_reset_token(token: str) -> str | None:
 
 
 def get_current_date():
-    now = datetime.now()
+    now = datetime.utcnow()
     return datetime(now.year, now.month, now.day)
 
 
 def get_next_month_date():
-    now = datetime.now()
+    now = datetime.utcnow()
     return now + relativedelta(months=1)
