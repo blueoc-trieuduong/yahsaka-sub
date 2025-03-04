@@ -1,6 +1,7 @@
 import uuid
 
-from sqlmodel import Field, Relationship, SQLModel
+import sqlalchemy as sa
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 from app.models.apps import AppBase
 from app.models.orgs import OrgBase
@@ -22,7 +23,7 @@ class User(UserBase, table=True):
 
 
 class Org(OrgBase, table=True):
-    id: int = Field(default=None, primary_key=True)
+    id: int = Field(sa_column=Column(sa.Integer, primary_key=True, autoincrement=True))
 
     users: list[User] = Relationship(back_populates="org")
     subscriptions: list["Subscription"] = Relationship(back_populates="org")

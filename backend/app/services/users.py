@@ -10,12 +10,23 @@ from app.models.users import Roles, UserPublic, UserRegister, UserUpdate
 
 class UserServices:
     def register_user(*, session: Session, user_register: UserRegister) -> UserPublic:
+        """
+        Đăng ký user mới, tạo tổ chức trước, sau đó tạo user.
+        """
         UserServices.check_register_user(session=session, user_register=user_register)
+
         try:
-            print("user_register")
+            print("user_register", user_register)
+
             org_obj = Org.model_validate(user_register.org)
-            print("org_obj", org_obj)
             session.add(org_obj)
+            session.commit()
+            session.refresh(org_obj)
+            print("✅ Tổ chức đã tạo:", org_obj)
+
+            if not org_obj.id:
+                raise ValueError("❌ Lỗi: org_obj.id vẫn là None sau khi commit!")
+
             user_obj = User.model_validate(
                 user_register.user,
                 update={
@@ -24,17 +35,19 @@ class UserServices:
                     "role": Roles.OWNER.value,
                 },
             )
-            print("user_obj", user_obj)
             session.add(user_obj)
-            session.commit()
-            session.refresh(org_obj, user_obj)
+            session.commit()  # ✅ Commit để lưu user
+            session.refresh(user_obj)  # ✅ Refresh để đảm bảo user có ID
+            print("✅ Người dùng đã tạo:", user_obj)
+
         except Exception as e:
             session.rollback()
-            print("e", e)
+            print("❌ Lỗi khi đăng ký:", str(e))
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to register: {str(e)}",
             )
+
         return UserPublic.model_validate(user_obj)
 
     def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
