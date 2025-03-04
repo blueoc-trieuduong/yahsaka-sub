@@ -8,17 +8,11 @@ from app.models.models import Org, Package, User
 
 
 class TimesheetServices:
-    @staticmethod
     def create_timesheet_org(session: Session, org_id: int, package_id: uuid.UUID):
         package = session.get(Package, package_id)
         org_obj = session.get(Org, org_id)
 
-        if not org_obj:
-            raise ValueError(f"❌ Không tìm thấy tổ chức với org_id={org_id}")
-
-        user_obj = session.get(User, org_obj.user_id)
-        if not user_obj:
-            raise ValueError(f"❌ Không tìm thấy admin user với org_id={org_id}")
+        user_obj = session.exec(User.select().where(User.org_id == org_id)).first()
 
         max_employees = package.max_employees if package else 0
 
@@ -39,6 +33,7 @@ class TimesheetServices:
             "password": "RandomPass123!",
             "password_confirmation": "RandomPass123!",
         }
+        print("org_params", org_params)
 
         headers = {
             "Authorization": f"Bearer {settings.API_TOKEN}",
@@ -50,6 +45,7 @@ class TimesheetServices:
             headers=headers,
             data=org_params,
         )
+        print("update_response", update_response)
 
         return update_response
 
@@ -76,10 +72,12 @@ class TimesheetServices:
             "tax_code": org_obj.tax_code or "",
             "max_employees": max_employees,
         }
+        print("update_params", update_params)
         update_response = requests.put(
             f"{settings.TIMESHEET_API_URL}/organization/{org_id}",
             headers=headers,
             json=update_params,
         )
+        print("update_response", update_response)
 
         return update_response

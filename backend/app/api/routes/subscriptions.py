@@ -248,6 +248,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
 
             if pending_subscription:
                 print("✅ Subscription PENDING được kích hoạt.")
+                TimesheetServices.update_timesheet_org(
+                    session=session,
+                    org_id=pending_subscription.org_id,
+                    package_id=pending_subscription.package_id,
+                )
                 pending_subscription.status = Status.ACTIVE
                 pending_subscription.updated_at = now
 
@@ -291,6 +296,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 status=Status.ACTIVE,
                 active_date=new_active_date,
                 expired_date=new_expired_date,
+            )
+            TimesheetServices.update_timesheet_org(
+                session=session,
+                org_id=new_subscription.org_id,
+                package_id=new_subscription.package_id,
             )
 
             session.add(new_subscription)
