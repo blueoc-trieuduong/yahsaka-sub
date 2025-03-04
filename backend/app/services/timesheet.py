@@ -1,7 +1,7 @@
 import uuid
 
 import requests
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.models.models import Org, Package, User
@@ -12,7 +12,7 @@ class TimesheetServices:
         package = session.get(Package, package_id)
         org_obj = session.get(Org, org_id)
 
-        user_obj = session.exec(User.select().where(User.org_id == org_id)).first()
+        user_obj = session.exec(select(User).where(User.org_id == org_id)).first()
 
         max_employees = package.max_employees if package else 0
 
