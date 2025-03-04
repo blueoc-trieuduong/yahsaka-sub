@@ -26,6 +26,7 @@ class OrgCreate(SQLModel):
     country: str = Field(max_length=255)
     address: str | None = Field(default=None, max_length=255, nullable=True)
     tax_code: str | None = Field(default=None, max_length=255, nullable=True)
+    max_empoyees: int = Field(default=0, gt=0)
 
 
 class OrgUpdate(SQLModel):
