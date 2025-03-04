@@ -18,6 +18,7 @@ from app.models.subscriptions import (
 from app.services.subscriptions import (
     SubscriptionServices,
 )
+from app.services.timesheet import TimesheetServices
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
@@ -186,6 +187,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     org_id=org_id,
                     package_id=package_id,
                 )
+                TimesheetServices.create_timesheet_org(
+                    session=session,
+                    org_id=new_subscription.org_id,
+                    package_id=package_id,
+                )
 
                 return {
                     "status": "subscription created",
@@ -221,6 +227,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
 
             if pending_subscription:
+                TimesheetServices.update_timesheet_org(
+                    session=session,
+                    org_id=pending_subscription.org_id,
+                    package_id=pending_subscription.package_id,
+                )
                 pending_subscription.status = Status.ACTIVE
                 pending_subscription.updated_at = now
 

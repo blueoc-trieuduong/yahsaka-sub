@@ -10,29 +10,17 @@ from app.models.users import Roles, UserPublic, UserRegister, UserUpdate
 
 class UserServices:
     def register_user(*, session: Session, user_register: UserRegister) -> UserPublic:
-        """
-        Đăng ký user mới, tạo tổ chức trước, sau đó tạo user.
-        """
         UserServices.check_register_user(session=session, user_register=user_register)
 
         try:
-            print("🚀 Debug: Dữ liệu UserRegister nhận vào:", user_register)
-
-            # ✅ Bước 1: Tạo tổ chức từ `OrgCreate`
-            org_obj = Org(
-                **user_register.org.model_dump()
-            )  # Chuyển từ OrgCreate -> Org
+            org_obj = Org(**user_register.org.model_dump())
             session.add(org_obj)
             session.commit()
             session.refresh(org_obj)
 
-            print("✅ Tổ chức đã tạo:", org_obj)
-
-            # 🚨 Kiểm tra ID sau commit (vì AUTO_INCREMENT chỉ có sau commit)
             if not org_obj.id:
-                raise ValueError("❌ Lỗi: org_obj.id vẫn là None sau khi commit!")
+                raise ValueError("Invalid org")
 
-            # ✅ Bước 2: Tạo user, gán `org_id` từ tổ chức đã tạo
             user_obj = User(**user_register.user.model_dump())
             user_obj.password = get_password_hash(user_register.user.password)
             user_obj.org_id = org_obj.id
@@ -42,11 +30,8 @@ class UserServices:
             session.commit()
             session.refresh(user_obj)
 
-            print("✅ Người dùng đã tạo:", user_obj)
-
         except Exception as e:
             session.rollback()
-            print("❌ Lỗi khi đăng ký:", str(e))
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to register: {str(e)}",
