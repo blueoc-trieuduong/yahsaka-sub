@@ -18,6 +18,7 @@ from app.models.subscriptions import (
 from app.services.subscriptions import (
     SubscriptionServices,
 )
+from app.services.timesheet import TimesheetServices
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
@@ -198,6 +199,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 new_subscription = SubscriptionServices.create_subscription_from_stripe(
                     session=session,
                     stripe_sub_id=subscription_id,
+                    org_id=org_id,
+                    package_id=package_id,
+                )
+                TimesheetServices.create_timesheet_org(
+                    session=session,
                     org_id=org_id,
                     package_id=package_id,
                 )
