@@ -11,10 +11,15 @@ class TimesheetServices:
     def create_timesheet_org(session: Session, org_id: int, package_id: uuid.UUID):
         package = session.get(Package, package_id)
         org_obj = session.get(Org, org_id)
+        print("org_obbj", org_obj)
 
-        user_obj = session.exec(select(User).where(User.org_id == org_id)).first()
+        user_obj = session.exec(
+            select(User).where(int(User.org_id) == int(org_id))
+        ).first()
+        print("user_obj", user_obj)
 
         max_employees = package.max_employees if package else 0
+        print("max_employees", max_employees)
 
         org_params = {
             "organization_id": org_obj.id,
