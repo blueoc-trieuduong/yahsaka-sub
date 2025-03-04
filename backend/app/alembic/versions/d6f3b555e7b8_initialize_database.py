@@ -1,8 +1,8 @@
-"""init database
+"""initialize database
 
-Revision ID: 0b62d82e3eb9
+Revision ID: d6f3b555e7b8
 Revises:
-Create Date: 2025-02-22 21:35:40.731892
+Create Date: 2025-03-04 11:25:29.337156
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 
 # revision identifiers, used by Alembic.
-revision = '0b62d82e3eb9'
+revision = 'd6f3b555e7b8'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -29,15 +29,21 @@ def upgrade():
     )
     op.create_table('org',
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
+    sa.Column('phone_number', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
+    sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
+    sa.Column('max_empoyees', sa.Integer(), nullable=False),
+    sa.Column('industry', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
     sa.Column('slug', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
-    sa.Column('company_prefix', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
+    sa.Column('company_prefix', sqlmodel.sql.sqltypes.AutoString(length=25), nullable=False),
     sa.Column('country', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
     sa.Column('address', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
     sa.Column('tax_code', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_prefix'),
+    sa.UniqueConstraint('slug')
     )
     op.create_table('package',
     sa.Column('title', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
@@ -45,7 +51,7 @@ def upgrade():
     sa.Column('stripe_product_id', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
     sa.Column('stripe_price_id', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
     sa.Column('price', sa.Integer(), nullable=False),
-    sa.Column('max_workspaces', sa.Integer(), nullable=False),
+    sa.Column('max_workplaces', sa.Integer(), nullable=False),
     sa.Column('max_employees', sa.Integer(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
@@ -65,7 +71,7 @@ def upgrade():
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('org_id', sa.Uuid(), nullable=False),
+    sa.Column('org_id', sa.Integer(), nullable=False),
     sa.Column('password', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.ForeignKeyConstraint(['org_id'], ['org.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -74,12 +80,15 @@ def upgrade():
     op.create_index(op.f('ix_user_phone_number'), 'user', ['phone_number'], unique=True)
     op.create_table('subscription',
     sa.Column('stripe_sub_id', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
+    sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('active_date', sa.DateTime(), nullable=False),
+    sa.Column('expired_date', sa.DateTime(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('unsubscribe_at', sa.DateTime(), nullable=True),
     sa.Column('unsubscribe_reasons', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('org_id', sa.Uuid(), nullable=False),
+    sa.Column('org_id', sa.Integer(), nullable=False),
     sa.Column('package_id', sa.Uuid(), nullable=False),
     sa.ForeignKeyConstraint(['org_id'], ['org.id'], ),
     sa.ForeignKeyConstraint(['package_id'], ['package.id'], ),

@@ -139,7 +139,6 @@ class SubscriptionServices:
         stripe_sub_id = current_subscription.stripe_sub_id
         print("stripe_sub_id", stripe_sub_id)
 
-        # 🔹 Lấy thông tin subscription hiện tại từ Stripe
         stripe_subscription_response = requests.get(
             f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
             headers=headers,
