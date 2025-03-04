@@ -203,7 +203,7 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             if not subscription_id:
                 return {"status": "no subscription found in invoice"}
 
-            now = datetime.now()
+            now = datetime.utcnow()
 
             active_subscription = session.exec(
                 select(Subscription).where(
