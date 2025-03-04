@@ -1,0 +1,28 @@
+name: Yahsaka subscription dev
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  build:
+    name: Build and Deploy
+    runs-on: [self-hosted, dev]
+    
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v3
+
+    - name: Set Commit Hash as Environment Variable
+      id: set_commit_hash
+      run: |
+        COMMIT_HASH=$(git rev-parse --short HEAD)
+        echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+
+    - name: Build docker image
+      run: |
+        docker compose -f docker-compose.dev.yml --env-file ${{ secrets.ENV_PATH }} up -d

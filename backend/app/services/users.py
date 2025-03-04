@@ -1,15 +1,16 @@
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlmodel import Session, select
+from sqlmodel import Session, SQLModel, select
 
 from app.core.security import decode_token, get_password_hash
 from app.models.models import Org, User
-from app.models.users import UserPublic, UserRegister, UserUpdate
+from app.models.users import Roles, UserPublic, UserRegister, UserUpdate
 
 
 class UserServices:
     def register_user(*, session: Session, user_register: UserRegister) -> UserPublic:
+        UserServices.check_register_user(session=session, user_register=user_register)
         try:
             org_obj = Org.model_validate(user_register.org)
             session.add(org_obj)
@@ -18,6 +19,7 @@ class UserServices:
                 update={
                     "password": get_password_hash(user_register.user.password),
                     "org_id": org_obj.id,
+                    "role": Roles.OWNER.value,
                 },
             )
             session.add(user_obj)
@@ -51,13 +53,60 @@ class UserServices:
 
     def verify_email_token(*, session: Session, token: str) -> UserRegister:
         token_data = decode_token(token=token)
-        user_register = UserRegister.model_validate(token_data.sub)
+        user_register = UserRegister.model_validate_json(token_data.sub)
         user = UserServices.get_user_by_email(
             session=session, email=user_register.user.email
         )
         if user:
             raise HTTPException(
-                status_code=400,
+                status_code=409,
                 detail="The user with this email already exists in the system",
             )
         return user_register
+
+    def check_existing_entity(
+        *,
+        session: Session,
+        model: SQLModel,
+        attribute: str,
+        value: Any,
+        detail_message: str,
+    ):
+        existing_entity = session.exec(
+            select(model).where(getattr(model, attribute) == value)
+        ).first()
+        if existing_entity:
+            raise HTTPException(status_code=409, detail=detail_message)
+
+    def check_register_user(*, session: Session, user_register: UserRegister) -> None:
+        UserServices.check_existing_entity(
+            session=session,
+            model=User,
+            attribute="email",
+            value=user_register.user.email,
+            detail_message="The user with this email already exists in the system",
+        )
+
+        UserServices.check_existing_entity(
+            session=session,
+            model=User,
+            attribute="phone_number",
+            value=user_register.user.phone_number,
+            detail_message="User with this phone number already exists",
+        )
+
+        UserServices.check_existing_entity(
+            session=session,
+            model=Org,
+            attribute="slug",
+            value=user_register.org.slug,
+            detail_message="Org with this slug already exists",
+        )
+
+        UserServices.check_existing_entity(
+            session=session,
+            model=Org,
+            attribute="company_prefix",
+            value=user_register.org.company_prefix,
+            detail_message="Org with this prefix already exists",
+        )

@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 import jwt
 from fastapi import HTTPException, status
@@ -16,10 +15,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ALGORITHM = "HS256"
 
 
-def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
+def create_jwt_token(payload: str, expires_delta: timedelta) -> str:
     expire = datetime.now(timezone.utc) + expires_delta
-    to_encode = {"exp": expire, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(
+        {"exp": expire.timestamp(), "sub": payload},
+        settings.SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
     return encoded_jwt
 
 

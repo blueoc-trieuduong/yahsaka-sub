@@ -1,11 +1,11 @@
-import uuid
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
-from app.models.orgs import OrgCreate, OrgPublic
+from app.models.orgs import OrgCreate, OrgPublic, OrgUpdate
 
 
 class Roles(str, Enum):
@@ -30,7 +30,6 @@ class UserCreate(SQLModel):
     first_name: str = Field(max_length=255)
     last_name: str = Field(max_length=255)
     password: str = Field(min_length=8, max_length=40)
-    role: str = Field(max_length=255, default=Roles.OWNER.value)
 
 
 class UserRegister(SQLModel):
@@ -44,8 +43,14 @@ class UserUpdate(UserBase):
 
 
 class UserUpdateMe(SQLModel):
-    full_name: str | None = Field(default=None, max_length=255)
-    email: EmailStr | None = Field(default=None, max_length=255)
+    phone_number: str | None = Field(default=None, max_length=255)
+    first_name: str | None = Field(default=None, max_length=255)
+    last_name: str | None = Field(default=None, max_length=255)
+
+
+class UserProfileUpdate(SQLModel):
+    user: UserUpdateMe
+    org: OrgUpdate | None = Field(default=None)
 
 
 class UpdatePassword(SQLModel):
@@ -54,7 +59,7 @@ class UpdatePassword(SQLModel):
 
 
 class UserPublic(UserBase):
-    id: uuid.UUID
+    id: UUID
 
 
 class UsersPublic(SQLModel):
@@ -65,3 +70,23 @@ class UsersPublic(SQLModel):
 class UserDetails(SQLModel):
     user: UserPublic
     org: OrgPublic
+
+
+class UserJoinOrg(SQLModel):
+    phone_number: str = Field(max_length=255)
+    first_name: str = Field(max_length=255)
+    last_name: str = Field(max_length=255)
+    password: str = Field(min_length=8, max_length=40)
+
+
+class InviteOrgPayload(SQLModel):
+    email: EmailStr
+
+
+class InviteOrgTokenPayload(InviteOrgPayload):
+    org_id: UUID
+
+
+class JoinOrgPayload(SQLModel):
+    user: UserJoinOrg
+    token: str
