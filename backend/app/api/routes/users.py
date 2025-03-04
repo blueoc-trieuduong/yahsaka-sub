@@ -183,10 +183,12 @@ def verify_email(session: SessionDep, payload: VerifyEmailPayload) -> UserPublic
     """
     Verify email after user registers to the system
     """
+    print("start verify")
     user_register = UserServices.verify_email_token(
         session=session, token=payload.token
     )
     user = UserServices.register_user(session=session, user_register=user_register)
+    print("user", user)
     return user
 
 
