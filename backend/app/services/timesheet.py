@@ -13,9 +13,10 @@ class TimesheetServices:
         org_obj = session.get(Org, org_id)
         print("org_obbj", org_obj)
 
-        user_obj = session.exec(
-            select(User).where(int(User.org_id) == int(org_id))
-        ).first()
+        org_id = int(org_id)
+
+        user_obj = session.exec(select(User).where(User.org_id == org_id)).first()
+
         print("user_obj", user_obj)
 
         max_employees = package.max_employees if package else 0
