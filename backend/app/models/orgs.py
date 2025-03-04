@@ -19,6 +19,14 @@ class OrgBase(SQLModel):
 
 class OrgCreate(SQLModel):
     id: int
+    name: str = Field(max_length=255)
+    phone_number: str = Field(max_length=255)
+    email: str = Field(max_length=255)
+    industry: str = Field(max_length=255)
+    company_prefix: str = Field(unique=True, max_length=25)
+    country: str = Field(max_length=255)
+    address: str | None = Field(default=None, max_length=255, nullable=True)
+    tax_code: str | None = Field(default=None, max_length=255, nullable=True)
     admin_first_name: str = Field(max_length=255)
     admin_last_name: str = Field(max_length=255)
     admin_email: str = Field(max_length=255)
