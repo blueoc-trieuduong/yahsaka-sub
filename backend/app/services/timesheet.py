@@ -4,7 +4,7 @@ import requests
 from sqlmodel import Session
 
 from app.core.config import settings
-from app.models import Org, Package, User
+from app.models.models import Org, Package, User
 
 
 class TimesheetServices:
