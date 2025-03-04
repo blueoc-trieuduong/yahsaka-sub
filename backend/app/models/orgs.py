@@ -7,7 +7,7 @@ class OrgBase(SQLModel):
     name: str = Field(max_length=255)
     phone_number: str = Field(max_length=255)
     email: str = Field(max_length=255)
-    max_empoyees: int = Field(gt=0)
+    max_employees: int = Field(gt=0)
     industry: str = Field(max_length=255)
     company_prefix: str = Field(unique=True, max_length=25)
     country: str = Field(max_length=255)
@@ -26,7 +26,7 @@ class OrgCreate(SQLModel):
     country: str = Field(max_length=255)
     address: str | None = Field(default=None, max_length=255, nullable=True)
     tax_code: str | None = Field(default=None, max_length=255, nullable=True)
-    max_empoyees: int = Field(default=0, gt=0)
+    max_employees: int = Field(default=0, gt=0)
 
 
 class OrgUpdate(SQLModel):
