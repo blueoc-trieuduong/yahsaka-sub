@@ -83,6 +83,8 @@ def create_checkout_url(
 async def handle_stripe_webhook(request: Request, session: SessionDep):
     try:
         print("🔔 Webhook accessed")
+        client_ip = request.client.host
+        print(f"Client IP: {client_ip}")
         event = await request.json()
         print("Received event:", event)
 
