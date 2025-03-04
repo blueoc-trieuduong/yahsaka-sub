@@ -52,11 +52,15 @@ class UserServices:
         return session_user
 
     def verify_email_token(*, session: Session, token: str) -> UserRegister:
+        print("verify_email_token")
         token_data = decode_token(token=token)
+        print("token_data", token_data)
         user_register = UserRegister.model_validate_json(token_data.sub)
+        print("user_register", user_register)
         user = UserServices.get_user_by_email(
             session=session, email=user_register.user.email
         )
+        print("user", user)
         if user:
             raise HTTPException(
                 status_code=409,

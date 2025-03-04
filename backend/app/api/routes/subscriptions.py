@@ -247,7 +247,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
 
             if latest_subscription:
-                print("✅ Đánh dấu subscription cũ thành DONE.")
                 latest_subscription.status = Status.DONE
                 session.commit()
 
