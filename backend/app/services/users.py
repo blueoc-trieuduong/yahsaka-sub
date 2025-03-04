@@ -17,6 +17,7 @@ class UserServices:
 
         try:
             print("user_register", user_register)
+            print("org111", user_register.org)
 
             org_obj = Org.model_validate(user_register.org)
             print("org", org_obj)
