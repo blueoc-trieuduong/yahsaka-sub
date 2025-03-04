@@ -16,30 +16,32 @@ class UserServices:
         UserServices.check_register_user(session=session, user_register=user_register)
 
         try:
-            print("user_register", user_register)
-            print("org111", user_register.org)
+            print("🚀 Debug: Dữ liệu UserRegister nhận vào:", user_register)
 
-            org_obj = Org.model_validate(user_register.org)
-            print("org", org_obj)
+            # ✅ Bước 1: Tạo tổ chức từ `OrgCreate`
+            org_obj = Org(
+                **user_register.org.model_dump()
+            )  # Chuyển từ OrgCreate -> Org
             session.add(org_obj)
             session.commit()
             session.refresh(org_obj)
+
             print("✅ Tổ chức đã tạo:", org_obj)
 
+            # 🚨 Kiểm tra ID sau commit (vì AUTO_INCREMENT chỉ có sau commit)
             if not org_obj.id:
                 raise ValueError("❌ Lỗi: org_obj.id vẫn là None sau khi commit!")
 
-            user_obj = User.model_validate(
-                user_register.user,
-                update={
-                    "password": get_password_hash(user_register.user.password),
-                    "org_id": org_obj.id,
-                    "role": Roles.OWNER.value,
-                },
-            )
+            # ✅ Bước 2: Tạo user, gán `org_id` từ tổ chức đã tạo
+            user_obj = User(**user_register.user.model_dump())
+            user_obj.password = get_password_hash(user_register.user.password)
+            user_obj.org_id = org_obj.id
+            user_obj.role = Roles.OWNER.value
+
             session.add(user_obj)
-            session.commit()  # ✅ Commit để lưu user
-            session.refresh(user_obj)  # ✅ Refresh để đảm bảo user có ID
+            session.commit()
+            session.refresh(user_obj)
+
             print("✅ Người dùng đã tạo:", user_obj)
 
         except Exception as e:
