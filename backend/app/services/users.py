@@ -12,7 +12,9 @@ class UserServices:
     def register_user(*, session: Session, user_register: UserRegister) -> UserPublic:
         UserServices.check_register_user(session=session, user_register=user_register)
         try:
+            print("user_register")
             org_obj = Org.model_validate(user_register.org)
+            print("org_obj", org_obj)
             session.add(org_obj)
             user_obj = User.model_validate(
                 user_register.user,
@@ -22,11 +24,13 @@ class UserServices:
                     "role": Roles.OWNER.value,
                 },
             )
+            print("user_obj", user_obj)
             session.add(user_obj)
             session.commit()
             session.refresh(org_obj, user_obj)
         except Exception as e:
             session.rollback()
+            print("e", e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to register: {str(e)}",
