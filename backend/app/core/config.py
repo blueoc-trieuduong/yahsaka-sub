@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: str | None = None
     EMAILS_FROM_NAME: str | None = None
     STRIPE_SECRET_KEY: str
+    TIMESHEET_API_URL: str
+    API_TOKEN: str
 
     @model_validator(mode="after")
     def _set_default_emails_from(self) -> Self:

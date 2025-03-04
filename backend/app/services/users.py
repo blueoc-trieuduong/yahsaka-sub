@@ -11,26 +11,32 @@ from app.models.users import Roles, UserPublic, UserRegister, UserUpdate
 class UserServices:
     def register_user(*, session: Session, user_register: UserRegister) -> UserPublic:
         UserServices.check_register_user(session=session, user_register=user_register)
+
         try:
-            org_obj = Org.model_validate(user_register.org)
+            org_obj = Org(**user_register.org.model_dump())
             session.add(org_obj)
-            user_obj = User.model_validate(
-                user_register.user,
-                update={
-                    "password": get_password_hash(user_register.user.password),
-                    "org_id": org_obj.id,
-                    "role": Roles.OWNER.value,
-                },
-            )
+            session.commit()
+            session.refresh(org_obj)
+
+            if not org_obj.id:
+                raise ValueError("Invalid org")
+
+            user_obj = User(**user_register.user.model_dump())
+            user_obj.password = get_password_hash(user_register.user.password)
+            user_obj.org_id = org_obj.id
+            user_obj.role = Roles.OWNER.value
+
             session.add(user_obj)
             session.commit()
-            session.refresh(org_obj, user_obj)
+            session.refresh(user_obj)
+
         except Exception as e:
             session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to register: {str(e)}",
             )
+
         return UserPublic.model_validate(user_obj)
 
     def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
@@ -52,11 +58,15 @@ class UserServices:
         return session_user
 
     def verify_email_token(*, session: Session, token: str) -> UserRegister:
+        print("verify_email_token")
         token_data = decode_token(token=token)
+        print("token_data", token_data)
         user_register = UserRegister.model_validate_json(token_data.sub)
+        print("user_register", user_register)
         user = UserServices.get_user_by_email(
             session=session, email=user_register.user.email
         )
+        print("user", user)
         if user:
             raise HTTPException(
                 status_code=409,
@@ -93,14 +103,6 @@ class UserServices:
             attribute="phone_number",
             value=user_register.user.phone_number,
             detail_message="User with this phone number already exists",
-        )
-
-        UserServices.check_existing_entity(
-            session=session,
-            model=Org,
-            attribute="slug",
-            value=user_register.org.slug,
-            detail_message="Org with this slug already exists",
         )
 
         UserServices.check_existing_entity(

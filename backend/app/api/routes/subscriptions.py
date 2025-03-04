@@ -18,6 +18,7 @@ from app.models.subscriptions import (
 from app.services.subscriptions import (
     SubscriptionServices,
 )
+from app.services.timesheet import TimesheetServices
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
@@ -81,9 +82,7 @@ def create_checkout_url(
 @router.post("/webhook")
 async def handle_stripe_webhook(request: Request, session: SessionDep):
     try:
-        print("🔔 Webhook accessed")
         event = await request.json()
-        print("Received event:", event)
 
         if event.get("type") == "checkout.session.completed":
             session_data = event["data"]["object"]
@@ -101,7 +100,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     "Content-Type": "application/x-www-form-urlencoded",
                 }
 
-                # 🔹 Lấy subscription hiện tại từ Stripe
                 subscription_response = requests.get(
                     f"https://api.stripe.com/v1/subscriptions/{subscription_id}",
                     headers=headers,
@@ -115,7 +113,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 stripe_subscription = subscription_response.json()
                 subscription_item_id = stripe_subscription["items"]["data"][0]["id"]
 
-                # 🔹 Cập nhật subscription trên Stripe với gói mới
                 update_params = {
                     "items[0][id]": subscription_item_id,
                     "items[0][price]": new_price_id,
@@ -134,38 +131,35 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                         f"Failed to update subscription: {update_response.text}"
                     )
 
-                # 🔹 Lấy subscription `ACTIVE` gần nhất để upgrade
                 existing_subscription = session.exec(
                     select(Subscription)
                     .where(
                         Subscription.stripe_sub_id == subscription_id,
                         Subscription.status == Status.ACTIVE,
                     )
-                    .order_by(
-                        desc(Subscription.expired_date)
-                    )  # 🔥 Sắp xếp theo `expired_date` mới nhất
+                    .order_by(desc(Subscription.expired_date))
                 ).first()
 
                 if existing_subscription:
-                    print(
-                        "✅ Subscription gần nhất được nâng cấp, đánh dấu là UPGRADED."
-                    )
                     existing_subscription.status = Status.UPGRADED
                     existing_subscription.updated_at = datetime.utcnow()
                     session.commit()
 
-                # 🔹 Tạo subscription mới với gói upgrade
-                print("🔔 Tạo subscription mới sau khi upgrade.")
                 new_active_date = existing_subscription.expired_date + timedelta(days=1)
                 new_expired_date = new_active_date + relativedelta(months=1)
 
                 new_subscription = Subscription(
                     org_id=existing_subscription.org_id,
-                    package_id=package_id,  # Gói mới
+                    package_id=package_id,
                     stripe_sub_id=subscription_id,
                     status=Status.ACTIVE,
                     active_date=new_active_date,
                     expired_date=new_expired_date,
+                )
+                TimesheetServices.update_timesheet_org(
+                    session=session,
+                    org_id=existing_subscription.org_id,
+                    package_id=package_id,
                 )
 
                 session.add(new_subscription)
@@ -188,16 +182,19 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 ).first()
 
                 if existing_subscription:
-                    print("✅ Subscription đã tồn tại, không tạo mới.")
                     return {
                         "status": "subscription already exists",
                         "subscription_id": subscription_id,
                     }
 
-                print("🔔 Tạo subscription mới từ checkout session.")
                 new_subscription = SubscriptionServices.create_subscription_from_stripe(
                     session=session,
                     stripe_sub_id=subscription_id,
+                    org_id=org_id,
+                    package_id=package_id,
+                )
+                TimesheetServices.create_timesheet_org(
+                    session=session,
                     org_id=org_id,
                     package_id=package_id,
                 )
@@ -208,15 +205,12 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 }
 
         elif event.get("type") == "invoice.payment_succeeded":
-            print("🔔 Stripe vừa tự động trừ tiền! Kiểm tra subscription...")
-
             subscription_id = event["data"]["object"]["subscription"]
             if not subscription_id:
                 return {"status": "no subscription found in invoice"}
 
             now = datetime.utcnow()
 
-            # 🔹 Kiểm tra nếu subscription hiện tại vẫn còn hạn thì không tạo mới
             active_subscription = session.exec(
                 select(Subscription).where(
                     Subscription.stripe_sub_id == subscription_id,
@@ -226,13 +220,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
 
             if active_subscription:
-                print("✅ Subscription hiện tại vẫn còn hạn, không tạo mới.")
                 return {
                     "status": "subscription still active",
                     "subscription_id": active_subscription.id,
                 }
 
-            # 🔹 Kiểm tra nếu có subscription `PENDING`, kích hoạt nó thay vì tạo mới
             pending_subscription = session.exec(
                 select(Subscription).where(
                     Subscription.stripe_sub_id == subscription_id,
@@ -241,7 +233,11 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
 
             if pending_subscription:
-                print("✅ Subscription PENDING được kích hoạt.")
+                TimesheetServices.update_timesheet_org(
+                    session=session,
+                    org_id=pending_subscription.org_id,
+                    package_id=pending_subscription.package_id,
+                )
                 pending_subscription.status = Status.ACTIVE
                 pending_subscription.updated_at = now
 
@@ -253,7 +249,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                 ).first()
 
                 if active_subscription_old:
-                    print("✅ Đánh dấu subscription ACTIVE cũ thành DONE.")
                     active_subscription_old.status = Status.DONE
 
                 session.commit()
@@ -262,7 +257,6 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
                     "subscription_id": pending_subscription.id,
                 }
 
-            # 🔹 Nếu không có PENDING, tạo subscription mới
             latest_subscription = session.exec(
                 select(Subscription)
                 .where(Subscription.stripe_sub_id == subscription_id)
@@ -270,14 +264,12 @@ async def handle_stripe_webhook(request: Request, session: SessionDep):
             ).first()
 
             if latest_subscription:
-                print("✅ Đánh dấu subscription cũ thành DONE.")
                 latest_subscription.status = Status.DONE
                 session.commit()
 
             new_active_date = latest_subscription.expired_date + timedelta(days=1)
             new_expired_date = new_active_date + relativedelta(months=1)
 
-            print("🔔 Tạo subscription mới sau khi Stripe trừ tiền.")
             new_subscription = Subscription(
                 org_id=latest_subscription.org_id,
                 package_id=latest_subscription.package_id,

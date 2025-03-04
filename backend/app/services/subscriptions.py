@@ -25,7 +25,6 @@ class SubscriptionServices:
         *, session: SessionDep, package_id: UUID, org_id: UUID
     ):
         try:
-            print("package_id", package_id)
             package = session.get(Package, package_id)
             if not package:
                 raise HTTPException(status_code=404, detail="Package not found")
@@ -35,7 +34,6 @@ class SubscriptionServices:
                 raise HTTPException(
                     status_code=400, detail="No price ID associated with this package"
                 )
-            print("price_id", price_id)
             stripe_session = StripeServices.create_stripe_checkout(
                 {"priceId": price_id, "org_id": org_id, "package_id": package_id}
             )
@@ -57,8 +55,6 @@ class SubscriptionServices:
         session: Session, stripe_sub_id: str, org_id: str, package_id: str
     ) -> SubscriptionCreate:
         try:
-            print("createSub access")
-
             new_subscription = Subscription(
                 stripe_sub_id=stripe_sub_id,
                 org_id=org_id,
@@ -130,16 +126,13 @@ class SubscriptionServices:
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # 🔹 Lấy thông tin package mới từ DB
         statement = select(Package).where(Package.id == new_package_id)
         new_package = session.exec(statement).first()
         if not new_package:
             raise HTTPException(status_code=404, detail="Package not found")
 
         stripe_sub_id = current_subscription.stripe_sub_id
-        print("stripe_sub_id", stripe_sub_id)
 
-        # 🔹 Lấy thông tin subscription hiện tại từ Stripe
         stripe_subscription_response = requests.get(
             f"https://api.stripe.com/v1/subscriptions/{stripe_sub_id}",
             headers=headers,
@@ -166,8 +159,6 @@ class SubscriptionServices:
             data=update_params,
         )
 
-        print("res downgrade", update_response.json())
-
         if update_response.status_code != 200:
             raise Exception(
                 f"Failed to update subscription on Stripe: {update_response.text}"
@@ -176,7 +167,7 @@ class SubscriptionServices:
         new_subscription = Subscription(
             org_id=current_subscription.org_id,
             package_id=new_package_id,
-            stripe_sub_id=stripe_sub_id,  # Vẫn dùng ID cũ
+            stripe_sub_id=stripe_sub_id,
             status=Status.PENDING,
             active_date=current_subscription.expired_date + timedelta(days=1),
             expired_date=current_subscription.expired_date + relativedelta(months=1),
@@ -310,7 +301,6 @@ class SubscriptionServices:
             )
 
     def create_subscription_upgrade(session, package_id, org_id, subscription_id):
-        print("accessService")
         package = session.get(Package, package_id)
         if not package:
             raise HTTPException(status_code=404, detail="Package not found")
@@ -321,7 +311,5 @@ class SubscriptionServices:
             "package_id": package_id,
             "subscription_id": subscription_id,
         }
-        print("checkoutdata", checkout_data)
-
         checkout_session = StripeServices.create_proration_checkout(checkout_data)
         return checkout_session

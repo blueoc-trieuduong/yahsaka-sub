@@ -1,6 +1,7 @@
 import uuid
 
-from sqlmodel import Field, Relationship, SQLModel
+import sqlalchemy as sa
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 from app.models.apps import AppBase
 from app.models.orgs import OrgBase
@@ -15,14 +16,14 @@ class BaseModel(SQLModel):
 
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    org_id: uuid.UUID = Field(foreign_key="org.id")
+    org_id: int = Field(foreign_key="org.id")
     password: str
 
     org: "Org" = Relationship(back_populates="users")
 
 
 class Org(OrgBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    id: int = Field(sa_column=Column(sa.Integer, primary_key=True, autoincrement=True))
 
     users: list[User] = Relationship(back_populates="org")
     subscriptions: list["Subscription"] = Relationship(back_populates="org")
@@ -30,7 +31,7 @@ class Org(OrgBase, table=True):
 
 class Subscription(SubscriptionBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    org_id: uuid.UUID = Field(foreign_key="org.id")
+    org_id: int = Field(foreign_key="org.id")
     package_id: uuid.UUID = Field(foreign_key="package.id")
 
     org: "Org" = Relationship(back_populates="subscriptions")
